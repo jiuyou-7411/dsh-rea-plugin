@@ -1,0 +1,85 @@
+name: 校验
+
+# 每次推到 main 或开 PR 都跑，防止语法错误和打包缺失进仓库。
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'assets/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    name: 语法检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 前端和 Host 两侧都是普通 ESM/IIFE，node --check 能挡住绝大多数
+      # 手滑：多了括号、少了逗号、模板串没闭合。
+      - name: 检查所有 JS 语法
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            if ! node --check "$f" 2>&1; then
+              echo "::error file=$f::语法错误"
+              fail=1
+            fi
+          done < <(git ls-files '*.js' '*.mjs' | grep -v '^vendor/')
+          exit $fail
+
+  package:
+    name: 打包完整性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # verify-package.mjs 断言的是「装完能不能用」：文档树在不在、
+      # lib 里的关键模块在不在、package.json 的字段齐不齐。
+      - name: 运行打包前检查
+        run: node scripts/verify-package.mjs
+
+      - name: 造一个 tarball 看产物
+        run: npm pack --dry-run 2>&1 | tail -20
+
+  manifest:
+    name: 清单一致性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # cordis.patch.yml 里的 reaVersion 是钉死的上游版本。这条检查确保
+      # 它和 package.json 里记录的一致，避免升级时只改了一处。
+      - name: 检查版本钉是否同步
+        run: |
+          PINNED=$(grep -oE 'reaVersion:\s*"[^"]+"' cordis.patch.yml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo "cordis.patch.yml 钉的上游版本：$PINNED"
+          if [ -z "$PINNED" ]; then
+            echo "::error::cordis.patch.yml 里没有找到 reaVersion"
+            exit 1
+          fi
+
+      - name: 检查必需入口文件
+        run: |
+          for f in index.js client.js cordis.patch.yml package.json; do
+            if [ ! -f "$f" ]; then
+              echo "::error::缺少 $f"
+              exit 1
+            fi
+          done
+          echo "入口文件齐全"

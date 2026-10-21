@@ -1,0 +1,47 @@
+# 市场条目：awesome-dsh-plugin
+#
+# 投稿方式：把下面的内容保存为 data/plugins/jiuyou-7411__dsh-rea-plugin.yml，
+#           向 https://github.com/awesome-dsh-plugin/awesome-dsh-plugin 提 PR。
+#
+# 该仓库的规则要点：
+#   - 仓库需声明 dsh.bundle（本仓库 cordis.patch.yml 已声明）
+#   - 仓库创建需满 1 天
+#   - 仓库需带 dsh-plugin topic
+#   - 描述必须属实，不含营销词（「最强」「无敌」这类会被退）
+#   - 一个 PR 最多 3 条
+#
+# 注意：投稿前先确认 npm 包已发布。市场脚本优先走 npm，
+# 没有 npm 名才退回 tarball。
+
+url: https://github.com/jiuyou-7411/dsh-rea-plugin
+name: jiuyou-7411/dsh-rea-plugin
+category: tools
+description:
+  en: >-
+    Chinese-language workbench for REA (Reverse Engineer Anything) inside DeepSeek Harness.
+    Registers 220 reverse-engineering tools as mcp__rea__* and ships an in-process MCP
+    client (JSON-RPC 2.0 over stdio) so no @deepseek-ai/dsh-mcp-client row is required.
+    The panel adds what the upstream adapter does not: per-session call statistics, a live
+    call stream with arguments and replies, grouped error history translated into Chinese
+    with fix hints, a most-used-tools ranking, one-click engine install with progress
+    (Ghidra / JADX / apktool / Frida), and a capability matrix per target class. Bundles
+    72 offline analysis documents and 4 agent skills. Analysis is upstream's and returns
+    decompiler output, not original source; native targets need Ghidra (1.5 GB) installed.
+  zh: >-
+    REA（逆向一切）的中文工作台，跑在 DeepSeek Harness 里。把 220 个逆向工具注册为
+    mcp__rea__*，并自带一个进程内 MCP 客户端（JSON-RPC 2.0 over stdio），
+    不需要 @deepseek-ai/dsh-mcp-client 那一行，也就避开了它的多点精确版本 peer 启动失败。
+    面板补的正是上游适配器没有的部分：本次会话的调用统计、带参数与返回的实时调用流、
+    按工具聚合并把报错翻译成中文附修复建议、常用工具排行、
+    带进度的一键引擎安装（Ghidra / JADX / apktool / Frida）、按目标类别划分的能力矩阵。
+    内置 72 篇离线分析文档与 4 个 Agent 技能。逆向能力由上游提供，
+    返回的是反编译产物而非原始源码；分析 native 目标需另装 Ghidra（1.5 GB）。
+tags:
+  - reverse-engineering
+  - android
+  - ghidra
+  - jadx
+  - frida
+  - chinese
+  - workbench
+  - ui
