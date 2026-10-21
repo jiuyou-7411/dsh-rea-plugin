@@ -71,7 +71,9 @@
     "sync:docs": "node scripts/vendor-docs.mjs",
     "sync:all": "npm run sync:rea-skills && npm run sync:doc-index && npm run sync:docs && npm run build:skills",
     "build:skills": "node scripts/build-skills.mjs",
-    "verify": "node scripts/verify-package.mjs"
+    "verify": "node scripts/verify-package.mjs",
+    "publish": "node scripts/publish.mjs",
+    "publish:dry": "node scripts/publish.mjs --dry-run"
   },
   "repository": {
     "type": "git",
