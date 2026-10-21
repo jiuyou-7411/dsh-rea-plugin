@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 babiq
+Copyright (c) 2026 jiuyou-7411
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-party content bundled in vendor/ is distributed under the licenses of
+its original projects:
+
+  vendor/mobilere/    MobileRE-Skill — MIT
+                      https://github.com/index-login/MobileRE-Skill
+
+  vendor/rea-skills/  REA agent skills — MIT
+                      https://github.com/morluto/rea
+                      pinned to commit d672cc23998b
+
+  vendor/rea-docs/    REA documentation — MIT
+                      https://github.com/morluto/rea
+                      pinned to commit 25bea07b4211
+
+The rea-agents MCP server itself is NOT bundled: it is fetched at runtime by
+`npx rea-agents@<pinned version>` and remains subject to its own license.
