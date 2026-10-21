@@ -54,6 +54,32 @@ function run(cmd, cmdArgs, { allowFail = false } = {}) {
   }
 }
 
+/**
+ * 拿命令的完整输出（stdout + stderr）。
+ *
+ * 为什么单独一个函数：npm 把 `npm notice` 和 `npm pack --dry-run` 的产物
+ * 摘要都写到 **stderr**，不是 stdout。只读 stdout 会得到一个空串，然后
+ * `.match()` 对着 undefined 报错 —— 而这本来是拿来做预览的，不该让发布
+ * 卡在一个只读信息上。
+ *
+ * 失败时返回 { failed: true, text }，调用方自己决定要不要因此中止。
+ */
+function capture(cmd, cmdArgs) {
+  try {
+    const stdout = execFileSync(cmd, cmdArgs, {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
+    return { failed: false, text: String(stdout ?? '') };
+  } catch (error) {
+    const stderr = (error.stderr ?? '').toString();
+    const stdout = (error.stdout ?? '').toString();
+    return { failed: true, text: `${stdout}\n${stderr}`, stderr, stdout };
+  }
+}
+
 function step(title) {
   console.log(`\n\x1b[36m▸ ${title}\x1b[0m`);
 }
@@ -81,31 +107,33 @@ if (dryRun) console.log('\x1b[33m（演练模式，不会真的发布）\x1b[0m'
 
 step('检查登录状态');
 
-const whoami = run('npm', ['whoami', `--registry=${REGISTRY}`], { allowFail: true });
-if (whoami.failed) {
+const whoami = capture('npm', ['whoami', `--registry=${REGISTRY}`]);
+if (whoami.failed || !whoami.text.trim()) {
   fail('未登录 npm 官方源');
   console.log(`
   先在这个终端里跑一次登录：
 
     npm login --registry=${REGISTRY}
 
-  按提示输入用户名、密码、邮箱，再用验证器（或邮件验证码）确认。
+  浏览器会打开授权页，点 Authorize 即可。
   登录后重新运行本脚本。
 `);
   process.exit(1);
 }
-ok(`已登录：${whoami.stdout}`);
+const me = whoami.text.trim().split('\n').pop().trim();
+ok(`已登录：${me}`);
 
 // ─── 3. 版本是否已存在 ────────────────────────────────────────────────────
 
 step('检查版本占用');
 
-const existing = run(
+const existing = capture(
   'npm',
   ['view', `${pkg.name}@${pkg.version}`, 'version', `--registry=${REGISTRY}`],
-  { allowFail: true },
 );
-if (!existing.failed && existing.stdout) {
+// `npm view` 对不存在的版本返回非零并带 404；能拿到版本号才算已存在。
+const existingVersion = existing.failed ? '' : existing.text.trim();
+if (existingVersion && !/404|E404/.test(existingVersion)) {
   fail(`${pkg.name}@${pkg.version} 已存在于 npm`);
   console.log(`
   已发布的版本不能覆盖。改版本号后再发：
@@ -121,18 +149,17 @@ ok('版本可用');
 
 step('检查包名归属');
 
-const owner = run(
+const owner = capture(
   'npm',
   ['view', pkg.name, 'maintainers', '--json', `--registry=${REGISTRY}`],
-  { allowFail: true },
 );
-if (!owner.failed && owner.stdout) {
+if (!owner.failed && owner.text.trim()) {
   try {
-    const maintainers = JSON.parse(owner.stdout);
+    const maintainers = JSON.parse(owner.text.trim());
     const names = (Array.isArray(maintainers) ? maintainers : [maintainers])
       .map((m) => m?.name)
       .filter(Boolean);
-    if (names.length && !names.includes(whoami.stdout)) {
+    if (names.length && !names.includes(me)) {
       fail(`包名 ${pkg.name} 已被 ${names.join(', ')} 占用`);
       process.exit(1);
     }
@@ -162,14 +189,24 @@ try {
 
 step('预览将要发布的文件');
 
-const pack = run('npm', ['pack', '--dry-run', `--registry=${REGISTRY}`], {
-  allowFail: true,
-});
-if (!pack.failed) {
-  const sizeMatch = pack.stdout.match(/package size:\s*([\d.]+\s*\w+)/);
-  const filesMatch = pack.stdout.match(/total files:\s*(\d+)/);
-  if (filesMatch) ok(`${filesMatch[1]} 个文件`);
-  if (sizeMatch) ok(`压缩后 ${sizeMatch[1]}`);
+/*
+ * 这一步直接让 npm 把摘要打到终端，不经过 capture。
+ *
+ * 原因：npm 在 Windows 下走 `npm.cmd` → 真实 node 进程，打包摘要写在那个
+ * 子进程的 stderr 上，而 Node 的 execFileSync 只能拿到 `npm.cmd` 这一层
+ * 的输出 —— 摘要因此永远抓不到。之前用正则去 match 一个空串能崩掉整个
+ * 发布流程，而这一步本来就只是给人看一眼的。
+ *
+ * 交给终端自己打印，抓不到也不影响任何后续判断。
+ */
+try {
+  execFileSync('npm', ['pack', '--dry-run', `--registry=${REGISTRY}`], {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+} catch {
+  warn('打包预览没跑成，继续（不影响发布）');
 }
 
 // ─── 7. 发布 ──────────────────────────────────────────────────────────────
