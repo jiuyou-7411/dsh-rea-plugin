@@ -27,7 +27,7 @@
 
 ## 📸 界面预览
 
-![REA 工作台 v3.0.4](screenshot-v3.0.4.png)
+![REA 工作台 v3.0.4](assets/workbench-zh.png)
 
 ## 🔧 技术细节
 
