@@ -1,8 +1,43 @@
 # dsh-rea-plugin
 
-REA 逆向工作台，为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供 220 个逆向工具、72 篇离线文档和 4 个 Agent 技能。
+**REA 逆向工作台** —— 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供 220 个逆向工具、72 篇离线文档和 4 个 Agent 技能。
 
 装完插件，Android 分析立刻可用；native 分析需点一次 Ghidra 安装。
+
+界面全中文，不需要看英文就知道每个工具是做什么的。
+
+[![version](https://img.shields.io/badge/version-3.0.4-2ea44f?style=flat-square)](https://github.com/jiuyou-7411/dsh-rea-plugin/releases)
+[![tools](https://img.shields.io/badge/tools-220-0969da?style=flat-square)](https://github.com/jiuyou-7411/dsh-rea-plugin)
+[![docs](https://img.shields.io/badge/docs-72%20%E7%AF%87-8250df?style=flat-square)](https://github.com/jiuyou-7411/dsh-rea-plugin)
+[![license](https://img.shields.io/badge/license-MIT-3fb950?style=flat-square)](LICENSE)
+[![platform](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)](#安装)
+
+![REA 逆向工作台界面](assets/workbench-zh.png)
+
+---
+
+## 界面
+
+打开 DSH 左侧「REA」即可进入工作台：
+
+| 区域 | 作用 |
+|---|---|
+| **顶部导航** | 总览 / 实时流 / 错误 / 服务状态 / 引擎 / 能力，右侧是 GitHub 与引擎管理按钮 |
+| **KPI 卡片** | 服务状态、已加载工具、本次调用、失败次数、成功率 |
+| **常用工具** | 按调用次数排序，中文名 + 原始工具 ID 双行显示 |
+| **近期告警** | 失败调用会自动翻译成中文说明，并给出修复建议 |
+| **快捷操作** | 查看实时流、检查分析引擎、查看能力矩阵 |
+
+---
+
+## 为什么做这个
+
+逆向工具大多只有英文命令行，参数复杂、报错晦涩。这个插件把它们收进一个中文界面：
+
+- **不懂英文也能用** —— 工具名、报错、状态全部中文化
+- **报错能看懂** —— `file changed since it was read` 会翻译成「文件在你读过之后又被改动了」，并告诉你「重新读一次文件再改」
+- **不用记命令** —— 220 个工具列在面板里，点开就能看参数
+- **离线文档** —— 72 篇分析手册打包在插件里，断网也能查
 
 ---
 
