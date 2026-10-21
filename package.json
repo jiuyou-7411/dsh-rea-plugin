@@ -30,6 +30,7 @@
     "client.js",
     "cordis.patch.yml",
     "README.md",
+    "CHANGELOG.md",
     "INSTALL.md",
     "LICENSE",
     "CONTRIBUTING.md",
@@ -41,6 +42,10 @@
     "vendor/**",
     "!vendor/**/.gitkeep"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "license": "MIT",
   "author": "jiuyou-7411",
   "keywords": [
