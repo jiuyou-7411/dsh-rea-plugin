@@ -1,0 +1,25 @@
+{
+  "repo": "morluto/rea",
+  "ref": "d672cc23998b6cbb21c485f118595ebfb82fed33",
+  "syncedAt": "2026-10-21T06:12:28.028Z",
+  "skills": [
+    {
+      "name": "reverse-engineer-anything",
+      "files": 7,
+      "bytes": 90073,
+      "failed": []
+    },
+    {
+      "name": "rea-analysis-optimization",
+      "files": 3,
+      "bytes": 14255,
+      "failed": []
+    },
+    {
+      "name": "rea-tool-design",
+      "files": 1,
+      "bytes": 956,
+      "failed": []
+    }
+  ]
+}

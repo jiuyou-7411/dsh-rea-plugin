@@ -1,0 +1,39 @@
+# REA (Reverse Engineer Anything) integration for DeepSeek Harness.
+#
+# One row only.
+#
+# The MCP connection is NOT a profile row any more. A `rea-mcp` row needs
+# `@deepseek-ai/dsh-mcp-client` installed in the profile, and that package
+# carries nine exact-version peers; a profile missing any one of them starts the
+# row, fails inside it, and — because the row sets `failOnStartupError: false` —
+# reports nothing at all. The workbench then shows "0 tools" with no button that
+# could fix it, which is the failure this design removes.
+#
+# Instead the Host half owns the connection (lib/mcp-client.js): it spawns
+# `npx -y rea-agents@<pin> mcp`, speaks JSON-RPC over stdio, and registers the
+# 207 tools into this Host's own registry. The only requirements are Node and
+# npx, which this plugin already needs for the engines it installs.
+#
+# If a manual `rea-mcp` row already exists in the profile, remove it: two
+# registrations of the same `mcp__rea__*` names collide.
+- insert:
+    - id: rea-host
+      name: "dsh-rea-plugin"
+      config:
+        # Pinned upstream release. `npx` resolves this exact version, so an
+        # unrelated `latest` publish cannot change behaviour under us. Bump it
+        # deliberately and re-run the readiness probe after the upgrade.
+        reaVersion: "6.7.0"
+        # Install missing analysis engines on demand. The workbench panel's
+        # Install button starts a Host job that downloads with progress,
+        # extracts, verifies and writes each engine into ~/.dsh/rea-engines/.
+        # Set false for a strictly observational deployment.
+        autoInstallProviders: true
+        # Per-engine download cap in MiB. Ghidra is 543 MiB compressed, so a cap
+        # below that turns a Ghidra install into a reported failure instead of a
+        # truncated archive.
+        maxProviderDownloadMb: 2048
+        # Extra provider environment variables merged into the MCP launch. Leave
+        # empty to let the Host discover the engines it installed; set a value
+        # here to pin an engine that lives somewhere else.
+        providerEnv: {}

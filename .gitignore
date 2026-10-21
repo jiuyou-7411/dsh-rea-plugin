@@ -1,0 +1,27 @@
+# 依赖与运行产物
+node_modules/
+dist/
+*.tgz
+
+# 本地开发
+*.log
+.DS_Store
+Thumbs.db
+_*.mjs
+patch*.mjs
+w1.mjs
+w2.mjs
+
+# 测试与临时
+runs/
+reports/
+tmp/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 注意：vendor/ 必须提交
+# 它是离线运行的基础（72 篇文档、技能、MobileRE 工具），
+# 不进包就无法脱离网络工作。

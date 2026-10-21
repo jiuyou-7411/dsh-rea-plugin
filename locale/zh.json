@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "REA 逆向工程",
+    "description": "用 REA 工具链逆向原生二进制、Android 应用、Electron 与网页包。提供分析引擎一键安装（Ghidra / JADX / apktool / Frida）、宿主能力路由，以及针对加壳目标的脱壳流水线。"
+  }
+}

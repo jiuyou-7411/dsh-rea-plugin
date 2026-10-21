@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="REA reverse engineering">
+  <defs>
+    <linearGradient id="rea-g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0b1220"/>
+  <rect x="4" y="4" width="56" height="56" rx="11" fill="none" stroke="url(#rea-g)" stroke-width="1.4" opacity="0.7"/>
+  <!-- Magnifier over a bracket: inspection of code -->
+  <path d="M16 22 L16 16 L22 16" fill="none" stroke="#2dd4bf" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 22 L48 16 L42 16" fill="none" stroke="#2dd4bf" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16 42 L16 48 L22 48" fill="none" stroke="#2dd4bf" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 42 L48 48 L42 48" fill="none" stroke="#2dd4bf" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="29" cy="30" r="9" fill="none" stroke="#e2e8f0" stroke-width="2.8"/>
+  <path d="M36 37 L44 45" stroke="#e2e8f0" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="29" cy="30" r="3.4" fill="#2dd4bf"/>
+</svg>

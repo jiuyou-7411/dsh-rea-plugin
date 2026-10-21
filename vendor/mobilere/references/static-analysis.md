@@ -1,0 +1,246 @@
+# 静态分析（jadx-mcp 攻击面）
+
+> 何时读：用户提到"分析这个类/攻击面/序列化/反序列化/WebView/深链/Provider/Intent-filter/AIDL/Binder/Service"时读取。
+> 由 SKILL.md 任务路由表指向，按需读取。使用 jadx MCP 工具（`jadx_*`）。
+
+---
+
+## 一、攻击面枚举方法论
+
+**攻击面优先，hook 在后。** 先枚举所有外部可控入口，再决定 hook 什么。
+
+### 1.1 入口枚举（ingress：从 AndroidManifest 出发）
+
+| 入口 | 检查项 | 工具 |
+|------|--------|------|
+| Exported Activity | 是否有 intent-filter、是否 `<android:exported="true">`、是否需权限 | `jadx_get_android_manifest` |
+| Exported Service | ① 能否被外部 `startService`（Intent 型）；② **能否 `bindService` + 调用 AIDL/Messenger 方法**（Binder 型，见 §1.5） | 同上 |
+| Broadcast Receiver | 隐式 Intent 能否触发 | 同上 |
+| Content Provider | 读写权限、path traversal、FileProvider | 同上 |
+| Deep Link | scheme/host 配置、Intent Redirection | 搜索 intent-filter |
+| WebView 入口 | JS Bridge、loadUrl 可控性 | 搜索 `WebView` / `addJavascriptInterface` |
+| 反序列化入口 | Serializable/Parcelable 类 | 搜索 `readObject` / `createFromParcel` |
+
+### 1.2 数据流追踪（Taint Analysis）
+
+```
+Source（外部输入：Intent extras、URI 参数、文件路径、网络请求）
+  → Path（经过的代码路径）
+  → Sink（危险操作，见下表）
+```
+
+**Sink 全表**（按危险操作分类）：
+
+| 类 | Sink | 典型漏洞 |
+|----|------|---------|
+| **执行** | `startActivity`/`startService`/`sendBroadcast`（入参 Intent） | Intent 重定向（§1.4） |
+| | `Runtime.exec`/`ProcessBuilder`（拼接参数） | 命令注入 |
+| | `System.load`/`System.loadLibrary`/`dlopen`（动态路径） | native 加载 ACE |
+| | `DexClassLoader`/`Class.forName(字段).newInstance()` | 动态加载 / 反序列化 ACE |
+| **数据** | `File`/`FileOutputStream`/`FileWriter`（拼接路径） | 路径遍历 / 任意写 |
+| | `execSQL`/`rawQuery`（拼接） | SQL 注入 |
+| | `openInputStream`/`query`（URI 入参） | Provider 代理 / 文件窃取 |
+| **页面** | `loadUrl`/`loadData`/`addJavascriptInterface` | WebView 注入 / JS Bridge |
+| **IPC** | `bindService`/`transact`/`Messenger.send` | Binder 接口暴露（§1.5） |
+| | `PendingIntent.get*` + `send`（fillIn） | PI 劫持（§1.4） |
+| | `grantUriPermission`（目标可控） | 授权外泄（§1.4） |
+| **网络** | `HttpURLConnection`/`OkHttp`（URL 入参） | SSRF |
+| | `loadUrl(intent://)` | Intent 重定向（§1.4） |
+| **日志** | `Log.[dviwe]`（敏感字段） | 日志泄漏（系统应用读者） |
+
+- 模式匹配看代码行，污点分析追完整攻击路径
+- 跨组件跟踪：数据流经 Activity → Intent → Service/Receiver/Provider，多数工具在组件边界失明，需人工追踪
+- 7 类必须用污点分析才能检测的漏洞：路径遍历、Intent 重定向、WebView URL 注入、SQL 注入、Token 拦截、HTML/JS 注入、SSRF
+
+### 1.3 攻击面不限于单 App
+
+- 跨 App 共享 UID、隐式 Intent 劫持、权限继承、预装系统 App 的特权链路都是入口
+- SDK 继承宿主信任边界：攻击面 = SDK 代码 + 宿主代码，SAST 必须分析编译产物而非源码
+
+### 1.4 出口审计（egress：能力/身份外泄）
+
+攻击面不只有"入口"。**互补的另一半是"出口"——我把自身的身份、权限、URI 授权交给了谁。** 这类问题 Manifest 不声明（§1.1 枚举看不见），只在代码层：**创建/授权点 + 流向**。
+
+| 家族 | 机理 | 检测点 |
+|------|------|--------|
+| **PendingIntent 劫持** | 可变(mutable)+隐式(无组件)+交给外部 → 接收方 fillIn 组件，以属主身份启动任意组件 | `PendingIntent.get*` 创建点 → flags 含 `FLAG_MUTABLE`(0x2000000)/无 flag？→ 基 Intent 有 `setComponent/setClass/setPackage`？→ 是否出进程（Binder 返回/入参、Notification、Alarm） |
+| **grantUriPermission** | 把文件/Provider 权限授予攻击者指定包 | `grantUriPermission(pkg=入参,…)` 目标可控？ |
+| **Provider 代理** | 特权方拿调用者给的 URI，以自身 UID 查询 → 绕过调用者缺失权限 | `query/openInputStream(uriFromParam,…)` |
+| **Intent 重定向** | 入参 Intent 被转发 `startActivity`（可借受害者 UID 拉起非导出组件） | `startActivity(字段)` / `getParcelableExtra("android.intent.extra.INTENT")` 数据流 |
+| **隐式解析劫持** | PI/广播基 Action 被恶意组件抢注 | 通知 PI + 可抢注 action |
+
+- 判定：egress 漏洞的**起点是"创建/授权点"，不是组件声明**——所以必须离开 Manifest、进代码。
+- 动态侧：hook `PendingIntent.get*`（打 flags+baseIntent.getComponent()）、`PendingIntent.send`（打最终组件）、`grantUriPermission`。
+
+### 1.5 Binder 攻击面（AIDL / Messenger）
+
+> §1.1 只看得到"service 是否导出"；能调到什么在代码层。三层合取才构成漏洞：
+
+| 层 | 查什么 | 手段 |
+|----|--------|------|
+| ① 可达性 | service 导出？有 permission？ | Manifest / `drozer app.service.info` |
+| ② 鉴权 | 方法内有无 `sendingUid`/`getCallingUid`/`checkCallingPermission` 校验？ | 读 `onBind` 返回接口的实现 |
+| ③ 实质逻辑 | 被调到的那个实现有无敏感操作？ | 读实现体 |
+
+**基类/子类陷阱**：`exported="true"` 常指向 SDK 基类（回调空实现）；有逻辑的子类常 `exported=false`（默认）。必须核对 manifest 里声明的是哪一个。
+
+**两种 Binder 形态**：
+
+| 形态 | `onBind` 返回 | 驱动方式 | 判定特征 |
+|------|--------------|---------|---------|
+| **AIDL** | `IXxx.Stub` | `asInterface()` + 方法调用 | 源码有 `.aidl` / `IXxx extends IInterface` |
+| **Messenger** | `Messenger.getBinder()` | `Message(what, obj)` | `new Messenger(handler)` / `handleMessage` |
+
+**验证工具分工**：
+
+| 层 | 工具 | 要点 |
+|----|------|------|
+| **App 层**（普通应用自己的 Service） | 自建探针 `mode=bind_messenger` | `am` / `service call` / `drozer` 都够不到；`am` 只有 startService |
+| **Framework 层**（系统服务） | `service list`；`service call <svc> <code> [i32 N\|i64 N\|s16 STR]` | 调用者是 shell(uid 2000)，持有大量 signature 权限；"能调"≠"零权限 app 能利用"，定案用 AIDL `@EnforcePermission` 注解或普通 App 复核 |
+
+**判定要点**：
+
+| 情形 | 结论 |
+|------|------|
+| ① 可达 + ② 无鉴权 + ③ 有敏感操作 | 漏洞 |
+| ② 有鉴权（`sendingUid`/`getCallingUid`/`checkCallingPermission`） | 不可利用 |
+| ③ 落空（导出的基类空实现，有逻辑的子类未导出） | 不可利用 |
+| ① 不成立（未导出） | 不可达 |
+
+**探针命令**：
+```bash
+adb shell am start -n re.probe/.AttackActivity -a re.probe.ACTION_ATTACK \
+  --es mode bind_messenger --es target_pkg <pkg> --es target_class <service> \
+  --es payload_action <int> --es payload_key <k> --es payload_value <v>
+```
+
+---
+
+## 二、序列化攻击面扫描（Serializable / Parcelable）
+
+```
+Android 中所有 Serializable/Parcelable 类都可从 Intent 反序列化。
+攻击者构造恶意对象塞入 Intent extras → 触发 readObject()/createFromParcel() 中的危险 sink。
+
+Step 1: 搜索候选类（JADX）
+  方法1: 搜索方法名 "readObject" → 找到所有自定义反序列化入口
+  方法2: 搜索方法名 "createFromParcel" → 找到所有 Parcelable 工厂方法
+  方法3: 搜索类声明 "implements Serializable" / "implements Parcelable"
+
+Step 2: 逐个检查反序列化链
+  对每个 readObject(ObjectInputStream) 方法，追踪数据流：
+    ois.readObject() / readUTF() / readInt() 等  ← SOURCE
+    → 赋值给 this.xxx 字段                          ← FLOW
+    → 后续方法使用 this.xxx 做了什么？              ← SINK?
+
+Step 3: 重点 sink 模式
+  ├── Class.forName(字段).newInstance()       → 任意类实例化（Google Auth bug）
+  ├── Class.forName(字段).getMethod().invoke() → 任意方法反射调用
+  ├── new FileInputStream(字段) / new File(字段) → 路径遍历文件读取
+  ├── Runtime.exec(字段) / ProcessBuilder(字段) → 命令注入
+  ├── loadUrl(字段) / loadData(字段)           → WebView URL 注入
+  ├── startActivity(字段) / startService(字段) → Intent 重定向
+  └── SQLiteDatabase.execSQL(字段)            → SQL 注入
+
+Step 4: 确认字段外部可控
+  只要满足任一条件，字段即外部可控：
+  ├── 类本身实现了 Serializable → 可直接 Intent.putExtra()
+  ├── 类是某个 Intent extra 的成员字段 → 间接可控
+  └── 类通过 Bundle.putSerializable() 传递 → 间接可控
+```
+
+### 真实案例
+
+Google Auth Library `OAuth2Credentials`：`transportFactoryClassName` 字段可控 → `Class.forName(str).newInstance()`，bounty $3,133.70。
+
+---
+
+## 三、WebView 安全审计
+
+| 检查点 | 漏洞特征 |
+|--------|---------|
+| `addJavascriptInterface` | JS Bridge 暴露敏感方法 |
+| `setJavaScriptEnabled(true)` + 外部 URL | XSS 风险 |
+| `setAllowFileAccess(true)` | 任意文件读取 |
+| `onReceivedSslError` → `proceed()` | SSL 忽略（见 crypto-hook.md） |
+| `intent://` scheme | Intent 重定向 |
+| `loadUrl` 参数可控 | URL 注入 |
+
+---
+
+## 四、Deep Link / Content Provider
+
+### Deep Link 漏洞模式（5 种）
+
+1. scheme hijacking — scheme 可被恶意 app 抢注
+2. open redirect — 深链跳转到外部 URL
+3. intent redirection — 深链构造 Intent 跳转
+4. full intent redirection — 深链携带完整 Intent
+5. domain takeover — 域名归属变化
+
+### Content Provider 漏洞（7 类）
+
+1. 不安全 FileProvider
+2. 路径遍历
+3. 权限声明错误
+4. 代理请求降级
+5. 动态 URI 代理
+6. 敏感功能混入 CP
+7. SQL 注入
+
+---
+
+## 五、jadx-mcp 工具速查
+
+| 工具 | 用途 |
+|------|------|
+| `jadx_get_android_manifest` | 读取 AndroidManifest.xml |
+| `jadx_get_main_activity_class` | 获取主 Activity |
+| `jadx_get_main_application_classes_names` | 主应用类列表 |
+| `jadx_get_class_source` | 获取类源码 |
+| `jadx_get_methods_of_class` / `jadx_get_method_by_name` | 方法列表/源码 |
+| `jadx_get_fields_of_class` | 字段列表 |
+| `jadx_search_method_by_name` | 全局方法搜索（如 readObject） |
+| `jadx_get_resource_file` | 资源文件（如 network_security_config.xml） |
+| `jadx_get_smali_of_class` | smali 源码 |
+| `jadx_get_selected_text` | 获取当前选中文本 |
+| `jadx_rename_*` | 重命名类/方法/字段 |
+
+### Manifest 解析失败（jadx 乱码/二进制）
+
+- 症状：jadx 输出二进制 AXML（头 `03 00 0C 00`），apktool 报 `got: 0x000c0003` → 爱加密魔改（首 chunk 插 4 字节 + headerSize 谎报 0x000C）
+- 修复：`tools/fix_axml.py`（删 4 字节填充 + headerSize 回 8 + size 减 4）
+  ```bash
+  python3 tools/fix_axml.py -i base.apk -o base_fixed.apk
+  ```
+- 验证：jadx CLI `--no-src` 重解应为文本；备选 `aapt dump xmltree base.apk AndroidManifest.xml`
+
+---
+
+## 六、Windows 注意
+
+- **不要加 `--fs-case-sensitive`**：jadx 默认 case-fix 做别名兼容（实测同一 APK 默认输出 2919 个 `.java`，加该参数只剩 1952 个，丢类）；Windows 文件系统大小写不敏感。
+- **目录名 ≠ 包名**：输出目录名是 case-fix 别名（如全小写），以文件内 `package` 声明 + 文件头 `renamed from:` 注释为准。
+
+## 七、Compose / R8 短名应用的校验点定位
+
+R8 全量混淆后类/方法只剩 `a` / `b` / `lambda$...` 短名，顺调用链读会迷路。策略：**从可观测锚点反向定位**——
+
+1. 界面文案 / 错误提示 / 日志字符串 → 找到引用它的类
+2. 资源键（`jadx_get_resource_file`）、SharedPreferences 键、数据库表名/列名
+3. 网络路径与常量（`/verify`、`token`、hash 常量等）
+
+由锚点类反查校验点方法（`jadx_search_method_by_name` 搜 `check`/`verify` 等方法名），**不要沿 Compose lambda 链**（`Function0/1/2` 内联后无稳定结构）逐层读。
+
+---
+
+## 与动态分析的配合
+
+**静态找可能，动态验证实。** JADX 找代码路径（广度），Frida 验证运行时可达性（精度）。
+
+| 静态发现 | 动态验证 |
+|---------|---------|
+| 可疑 Intent 传递 | `intent_tracker`（behavior-analysis.md） |
+| 加密调用点 | `crypto_monitor`（crypto-hook.md） |
+| 反序列化 sink | 触发 deeplink 后观察 file/network 日志 |
+| 免检 WebView | `scripts/checklist/webview_ssl_check.js` |

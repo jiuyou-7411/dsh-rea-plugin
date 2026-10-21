@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "REA Reverse Engineering",
+    "description": "Reverse engineer native binaries, Android apps, Electron and web bundles with the REA toolkit. Adds one-click analysis-engine installation (Ghidra, JADX, apktool, Frida), host capability routing, and an unpack pipeline for packed targets."
+  }
+}

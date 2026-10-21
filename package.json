@@ -1,0 +1,79 @@
+{
+  "name": "dsh-rea-plugin",
+  "version": "3.0.0",
+  "private": false,
+  "type": "module",
+  "description": "REA 逆向工作台 for DeepSeek Harness：220 个工具（207 个上游 MCP 工具 + 6 个 MobileRE 动态分析 + 7 个本地工具）、72 篇离线文档、4 个 Agent 技能，引擎与 JDK 可一键安装，带热更新检查。",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "INSTALL.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "lib/*.js",
+    "scripts/*.mjs",
+    "skills/*.md",
+    "locale/*.json",
+    "icon.svg",
+    "vendor/**",
+    "!vendor/**/.gitkeep"
+  ],
+  "license": "MIT",
+  "author": "jiuyou-7411",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-rea",
+    "rea",
+    "reverse-engineering",
+    "mcp",
+    "binary-analysis",
+    "decompiler",
+    "ghidra",
+    "android",
+    "frida",
+    "deepseek-harness"
+  ],
+  "engines": {
+    "node": "^22.19.0 || ^24.11.0 || >=26.0.0"
+  },
+  "scripts": {
+    "sync:rea-skills": "node scripts/sync-rea-skills.mjs",
+    "sync:doc-index": "node scripts/gen-doc-index.mjs",
+    "sync:docs": "node scripts/vendor-docs.mjs",
+    "sync:all": "npm run sync:rea-skills && npm run sync:doc-index && npm run sync:docs && npm run build:skills",
+    "build:skills": "node scripts/build-skills.mjs",
+    "verify": "node scripts/verify-package.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiuyou-7411/dsh-rea-plugin.git"
+  },
+  "homepage": "https://github.com/jiuyou-7411/dsh-rea-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/jiuyou-7411/dsh-rea-plugin/issues"
+  }
+}
