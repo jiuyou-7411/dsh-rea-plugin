@@ -77,6 +77,72 @@ window.__ModuleLoader__.load({
     };
 
     /** Per-engine presentation, static so cards render before status arrives. */
+    /**
+     * Chinese names for the tools that show up in the usage list.
+     *
+     * A tool id is an API name, not a word: `win_bash` is "run a command" and
+     * `glob` is "find files by name". The panel is for people, so it says what
+     * the tool does and keeps the id as a muted second line.
+     */
+    const TOOL_LABELS = {
+      win_bash: '执行命令',
+      read: '读文件',
+      write: '写文件',
+      edit: '修改文件',
+      glob: '按名找文件',
+      grep: '搜文件内容',
+      present: '展示文件',
+      todo_write: '写任务清单',
+      web_fetch: '抓取网页',
+      web_search: '网页搜索',
+      ask_user_question: '向用户提问',
+      create_skill: '创建技能',
+      skill: '加载技能',
+      skill_vault: '技能库',
+      plugin_manager: '插件管理',
+      mcp_vault: 'MCP 配置',
+      subagent: '派子任务',
+      subagent_fork: '派子任务（带上下文）',
+      workflow: '多智能体流程',
+      schedule_create: '建定时任务',
+      schedule_list: '查看定时任务',
+      schedule_delete: '删定时任务',
+      schedule_update: '改定时任务',
+      interrupt_agent: '中断子任务',
+      send_message: '给子任务发消息',
+      list_agents: '查看子任务',
+      read_image: '看图',
+      read_mcp_resource: '读 MCP 资源',
+      list_mcp_resources: '列 MCP 资源',
+      load_workspace_dependencies: '加载工作区依赖',
+      working_directory: '切换工作目录',
+      cordis_inspect_list: '查看插件接口',
+      cordis_inspect_query: '查询插件状态',
+      job_output: '取后台任务结果',
+      job_list: '看后台任务',
+      job_kill: '停后台任务',
+      create_goal: '设长期目标',
+      get_goal: '查看目标',
+      update_goal: '更新目标',
+      exit_plan_mode: '退出计划模式',
+      config_backup: '备份配置',
+      config_restore: '恢复配置',
+      config_list_snapshots: '查看配置快照',
+      mobile_unpack: '脱壳',
+      mobile_frida: 'Frida 插桩',
+      mobile_check: '反注入检测',
+      mobile_so: 'SO 分析',
+      mobile_emulate: '指令模拟',
+      mobile_reference: '移动端手册',
+      rea_cli: 'REA 命令行',
+      rea_docs: 'REA 文档',
+      rea_unpack: '脱壳流水线',
+      rea_unpack_capabilities: '脱壳能力清单',
+      rea_provider_status: '引擎状态',
+      rea_provider_install: '安装引擎',
+      rea_capability_matrix: '能力矩阵',
+    };
+
     const ENGINES = {
       ghidra: {
         label: 'Ghidra',
@@ -300,6 +366,10 @@ window.__ModuleLoader__.load({
         .rea-btn-ghost{border-color:transparent;background:none}
         .rea-btn-sm{padding:4px 8px;font-size:11px}
         .rea-btn-sm svg{width:12px;height:12px}
+        /* An anchor styled as a button must not inherit link decoration, and a
+           square icon-only variant needs its padding balanced on both axes. */
+        .rea-btn-icon{text-decoration:none;cursor:pointer}
+        .rea-btn-icon svg{width:14px;height:14px}
         /* buttons on the dark bar invert for contrast */
         .rea-topnav .rea-btn{border-color:rgba(255,255,255,.13);background:transparent;color:var(--rail-ink)}
         .rea-topnav .rea-btn:hover{background:var(--rail-2);border-color:rgba(255,255,255,.22);color:var(--rail-ink-on)}
@@ -864,6 +934,26 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
         h('polyline', { points: '17 8 12 3 7 8' }),
         h('line', { x1: 12, y1: 3, x2: 12, y2: 15 })),
+      /**
+       * GitHub mark. Uses currentColor so it inherits the button's ink like every
+       * other icon here, and scales with the shared 14px box.
+       */
+      github: () => h('svg', {
+        width: 14, height: 14, viewBox: '0 0 16 16',
+        fill: 'currentColor', 'aria-hidden': 'true',
+      },
+        h('path', {
+          d: 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 '
+            + '0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13'
+            + '-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66'
+            + '.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15'
+            + '-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27'
+            + '.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12'
+            + '.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48'
+            + ' 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8'
+            + 'c0-4.42-3.58-8-8-8Z',
+        })),
+
       refresh: () => h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round' },
         h('polyline', { points: '23 4 23 10 17 10' }),
         h('path', { d: 'M20.49 15a9 9 0 1 1-2.12-9.36L23 10' })),
@@ -916,11 +1006,35 @@ window.__ModuleLoader__.load({
     }
 
     /** A ranked row: index, name, proportional bar, count. */
-    function RankRow({ index, name, value, max, suffix, tone }) {
+    /**
+     * One ranked row.
+     *
+     * `name` is the Chinese label and `raw` is the tool id. Both are shown: the
+     * label is what a non-programmer can act on, and the id underneath is what
+     * they need when searching documentation or reporting a problem. The id
+     * goes to the tooltip as well as a muted second line, so it is available
+     * without competing with the label.
+     */
+    function RankRow({ index, name, raw, value, max, suffix, tone }) {
       const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
       return h('div', { className: 'rea-rank-row' },
         h('span', { className: 'rea-rank-i' }, index),
-        h('span', { className: 'rea-rank-name', title: name }, name),
+        h('span', {
+          className: 'rea-rank-name',
+          title: raw ? `${name}（${raw}）` : name,
+          style: raw && raw !== name
+            ? { display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: '1.3' }
+            : undefined,
+        },
+          h('span', { style: { fontSize: '11.5px', color: 'var(--ink-1)', fontWeight: 600 } }, name),
+          raw && raw !== name
+            ? h('span', {
+                style: {
+                  fontFamily: 'var(--mono)', fontSize: '9.5px',
+                  color: 'var(--ink-4)', fontWeight: 400,
+                },
+              }, raw)
+            : null),
         h('span', { className: 'rea-rank-track' },
           h('span', { className: 'rea-rank-bar', style: { width: `${pct}%` } })),
         h('span', { className: `rea-rank-n${tone ? ` ${tone}` : ''}` }, suffix),
@@ -1220,14 +1334,27 @@ window.__ModuleLoader__.load({
                 body: '让 Agent 调用任意 REA 工具，统计会实时出现在这里。',
               })
             : h('div', { className: 'rea-rank' },
-                topTools.map((tool, index) => h(RankRow, {
-                  key: tool.tool,
-                  index: index + 1,
-                  name: tool.tool.replace(/^mcp__rea__/, ''),
-                  value: tool.calls,
-                  max: maxCalls,
-                  suffix: String(tool.calls),
-                })))),
+                topTools.map((tool, index) => {
+                  const zh = TOOL_LABELS[tool.tool];
+                  const isRea = tool.tool.startsWith('mcp__rea__');
+                  const rawName = isRea
+                    ? tool.tool.slice('mcp__rea__'.length)
+                    : tool.tool;
+
+                  // Prefer a hand-written Chinese label; fall back to the id so
+                  // an unmapped tool is still identifiable rather than blank.
+                  const label = zh ?? (isRea ? `REA · ${rawName}` : rawName);
+
+                  return h(RankRow, {
+                    key: tool.tool,
+                    index: index + 1,
+                    name: label,
+                    raw: zh ? rawName : null,
+                    value: tool.calls,
+                    max: maxCalls,
+                    suffix: String(tool.calls),
+                  });
+                }))),
       );
 
       const alertsBody = alerts.length === 0
@@ -1239,16 +1366,22 @@ window.__ModuleLoader__.load({
         : h('div', { className: 'rea-alerts' },
             alerts.map((group) => {
               const ex = group.explanation;
+              const who = group.toolLabel ?? group.tool;
+
+              /**
+               * The raw text appears exactly once.
+               *
+               * It used to render twice whenever no Chinese explanation matched:
+               * once as the headline fallback and again as the technical line
+               * underneath. Now the headline is Chinese when an explanation
+               * exists, and the English appears only as the small reference
+               * line — never as both.
+               */
               return h('div', { key: group.key, className: 'rea-alert' },
                 h('span', { className: 'rea-alert-dot', style: { background: 'var(--down)' } }),
                 h('div', { className: 'rea-alert-body' },
-                  // Chinese first. The English original stays underneath at
-                  // lower contrast, because the one time it is wanted is when
-                  // searching for it — but it must never be the only text.
                   h('span', { className: 'rea-alert-msg' },
-                    ex
-                      ? `${group.toolLabel ?? group.tool}：${ex.what}`
-                      : `${group.toolLabel ?? group.tool}：${group.message}`),
+                    ex ? `${who}：${ex.what}` : `${who}：无法识别的错误`),
                   ex
                     ? h('span', {
                         style: {
@@ -1265,6 +1398,8 @@ window.__ModuleLoader__.load({
                         },
                       }, '→ ' + ex.fix)
                     : null,
+                  // The original technical text, once, as the reference a search
+                  // or a bug report needs.
                   h('span', {
                     style: {
                       fontSize: '9.5px', color: 'var(--ink-4)',
@@ -1326,7 +1461,7 @@ window.__ModuleLoader__.load({
         summaryCard('缓冲区', String(metrics?.buffered ?? 0),
           ` / ${metrics?.maxEntries ?? STREAM_LIMIT}`,
           `丢弃 ${metrics?.dropped ?? 0} 条`),
-        summaryCard('连接', 'SSE', null, '实时推送中'));
+        summaryCard('连接', '实时', null, '服务端推送'));
 
       return h('div', null,
         h(McpBanner, {
@@ -1428,7 +1563,7 @@ window.__ModuleLoader__.load({
                   }, formatDuration(row.durationMs)),
                   h('span', {
                     className: `rea-tag ${row.ok ? 'rea-tag-ok' : 'rea-tag-fail'}`,
-                  }, row.ok ? 'OK' : 'FAIL'),
+                  }, row.ok ? '成功' : '失败'),
                 ))),
         ),
 
@@ -1455,12 +1590,12 @@ window.__ModuleLoader__.load({
           h('div', { className: 'rea-d-name' }, name),
           h('div', { className: 'rea-d-meta' },
             h('span', { className: `rea-tag ${ok ? 'rea-tag-ok' : 'rea-tag-fail'}` },
-              ok ? 'OK' : 'FAIL'),
+              ok ? '成功' : '失败'),
             h('span', { className: 'rea-tag rea-tag-mute' }, formatDuration(row.durationMs)),
             h('span', {
               className: 'rea-tag rea-tag-mute',
               style: { color: chipColor },
-            }, serverDown ? '断线' : 'SSE'))),
+            }, serverDown ? '断线' : '实时连接'))),
 
         h('dl', { className: 'rea-d-kv' },
           h('dt', null, '时间'),
@@ -1482,7 +1617,7 @@ window.__ModuleLoader__.load({
                   h('span', { className: 'rea-tok-n' }, 'false'), ',\n',
                   '  ', h('span', { className: 'rea-tok-k' }, '"error"'), ': {\n',
                   '    ', h('span', { className: 'rea-tok-k' }, '"message"'), ': ',
-                  h('span', { className: 'rea-tok-s' }, JSON.stringify(row.error ?? 'unknown')),
+                  h('span', { className: 'rea-tok-s' }, JSON.stringify(row.error ?? '（无错误信息）')),
                   '\n  }\n}'))),
 
         h('div', { className: 'rea-d-sec' },
@@ -1538,7 +1673,7 @@ window.__ModuleLoader__.load({
                       title: open ? '点击收起' : '点击展开原始报错',
                       onClick: () => setOpenKey(open ? null : group.key),
                     },
-                      ex ? ex.what : group.message,
+                      ex ? ex.what : '无法识别的错误',
                       ex && !open
                         ? h('span', {
                             style: {
@@ -1557,7 +1692,19 @@ window.__ModuleLoader__.load({
                             },
                           }, '→ ' + ex.fix)
                         : null,
-                      open
+                      // With no explanation, the raw text is the only reading —
+                      // show it inline rather than hiding it behind a click.
+                      !ex
+                        ? h('span', {
+                            style: {
+                              display: 'block', marginTop: '4px',
+                              fontFamily: 'var(--mono)', fontSize: '10px',
+                              color: 'var(--ink-3)', whiteSpace: 'pre-wrap',
+                              fontWeight: 400, wordBreak: 'break-all',
+                            },
+                          }, group.message)
+                        : null,
+                      open && ex
                         ? h('span', {
                             style: {
                               display: 'block', marginTop: '6px',
@@ -1890,7 +2037,7 @@ window.__ModuleLoader__.load({
                 h('div', null, info.version ?? `Java ${info.major}`),
                 h('div', {
                   style: { color: 'var(--ink-4)', marginTop: '2px' },
-                }, `来源：${info.source === 'plugin' ? '插件私有' : (info.source === 'path' ? 'PATH' : info.source)}`),
+                }, `来源：${info.source === 'plugin' ? '插件私有' : (info.source === 'path' ? '系统环境变量' : (info.source === 'java-home' ? 'JAVA_HOME' : (info.source === 'rea-java-home' ? 'REA_JAVA_HOME' : '未识别')))}`),
                 info.home
                   ? h('div', {
                       style: { color: 'var(--ink-4)', marginTop: '1px' },
@@ -3013,6 +3160,14 @@ window.__ModuleLoader__.load({
             h('span', { className: 'rea-stat rea-stat-hide' },
               '平均 ', h('b', { className: 'num' }, `${avg.value}${avg.unit}`)),
             h('span', { className: 'rea-tb-div' }),
+            h('a', {
+              className: 'rea-btn rea-btn-sm rea-btn-ghost rea-btn-icon',
+              href: 'https://github.com/jiuyou-7411/dsh-rea-plugin',
+              target: '_blank',
+              rel: 'noopener noreferrer',
+              title: '在 GitHub 上查看源码与更新',
+              'aria-label': 'GitHub 仓库',
+            }, Icon.github()),
             h('button', {
               type: 'button',
               className: 'rea-btn rea-btn-sm rea-btn-primary',
