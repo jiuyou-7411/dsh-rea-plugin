@@ -20,12 +20,32 @@ REA 逆向工作台，为 [DeepSeek Harness](https://github.com/deepseek-ai/deep
 
 ## 安装
 
+本插件通过 **GitHub 分发**，不走 npm（同名包 `dsh-plugin-rea` 已被他人发布，且国内访问 npm 不稳定）。
+
+### 方式一：克隆仓库（推荐）
+
 ```bash
 cd ~/.dsh/profiles/desktop
-npm install dsh-rea-plugin
+
+# 把插件克隆到本地
+git clone https://github.com/jiuyou-7411/dsh-rea-plugin.git plugins/dsh-rea-plugin
+
+# 声明为本地依赖
+npm install ./plugins/dsh-rea-plugin
 ```
 
-然后在 `cordis.yml` 加一行并重启 DSH：
+### 方式二：下载压缩包
+
+从 [Releases](https://github.com/jiuyou-7411/dsh-rea-plugin/releases) 下载 `dsh-rea-plugin-x.x.x.tgz`，然后：
+
+```bash
+cd ~/.dsh/profiles/desktop
+npm install /path/to/dsh-rea-plugin-3.0.0.tgz
+```
+
+### 启用
+
+在 `cordis.yml` 加一行，然后重启 DSH：
 
 ```yaml
 - id: rea-host
@@ -36,6 +56,16 @@ npm install dsh-rea-plugin
 ```
 
 详细步骤见 [INSTALL.md](INSTALL.md)。
+
+### 更新
+
+```bash
+cd ~/.dsh/profiles/desktop/plugins/dsh-rea-plugin
+git pull
+npm install
+```
+
+然后重启 DSH。面板顶部的横幅会显示「代码落后上游 N 个提交」——这是 `git fetch` 后的真实差异，不是猜测。
 
 ---
 
@@ -77,15 +107,35 @@ npm install dsh-rea-plugin
 
 ## 热更新
 
-插件**不能替换自己正在运行的代码**——Node 还开着那些文件，Windows 上连改名都会失败。所以更新是这样工作的：
+插件**不能替换自己正在运行的代码**——Node 还开着那些文件，Windows 上连改名都会失败。所以更新分两层：
 
-1. 每次打开面板，检查 npm 上有没有新版本（结果缓存 6 小时）
-2. 有新版就在顶部显示横幅，写出当前版本、最新版本和确切命令
-3. 你执行 `npm install dsh-rea-plugin@latest`，重启 DSH 生效
+### 前端：真热重载
 
-**前端会热重载，Host 端必须重启。** 这是模块系统的限制，不是省略。
+改 `client.js` 后，DSH 的 HMR 会直接替换界面，**不用重启**。
 
-如果当前是本地开发副本（`link:` / `file:` 依赖），横幅不显示——那说明版本差异来自你自己的改动，不是落后。
+### Host 端：必须重启
+
+改 `lib/*.js`、`index.js` 后必须重启 DSH。这不是偷懒，是模块加载器的限制。
+
+### 怎么知道有更新
+
+面板顶部横幅读的是 `git fetch` 之后 `HEAD..@{u}` 的真实提交差：
+
+```
+● 代码落后上游 3 个提交
+  在插件目录执行：
+  git pull && npm install
+  github.com/jiuyou-7411/dsh-rea-plugin
+                                            [检查上游]
+```
+
+**不是猜的，不是查 npm。** 没有 `.git` 的安装副本（比如从 tgz 装的）只显示仓库地址，不显示提交数。
+
+### 为什么不用 npm 检查版本
+
+同名的 `dsh-plugin-rea` 在 npm 上是另一个作者（`czcdr`）的包，版本 2.0.10。如果面板按 npm 版本比较，会提示你"更新"到别人的代码。
+
+所以 npm 检查是**默认关闭**的。需要时设环境变量 `REA_UPDATE_CHECK=1` 打开，且它仍然拒绝把低于当前版本的号当成"新版"。
 
 ---
 

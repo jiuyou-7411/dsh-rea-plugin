@@ -1,6 +1,6 @@
 {
   "name": "dsh-rea-plugin",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": false,
   "type": "module",
   "description": "REA 逆向工作台 for DeepSeek Harness：220 个工具（207 个上游 MCP 工具 + 6 个 MobileRE 动态分析 + 7 个本地工具）、72 篇离线文档、4 个 Agent 技能，引擎与 JDK 可一键安装，带热更新检查。",
