@@ -42,6 +42,7 @@ window.__ModuleLoader__.load({
       metricsReset: '/api/dsh-plugin-rea/metrics/reset',
       mcpStart: '/api/dsh-plugin-rea/mcp/start',
       update: '/api/dsh-plugin-rea/update',
+      selfUpdate: '/api/dsh-plugin-rea/self-update',
       jdk: '/api/dsh-plugin-rea/jdk',
       jdkInstall: '/api/dsh-plugin-rea/jdk/install',
       jdkUninstall: '/api/dsh-plugin-rea/jdk/uninstall',
@@ -364,6 +365,19 @@ window.__ModuleLoader__.load({
         }
         .rea-btn-primary:hover{background:#12544f;border-color:#12544f;color:var(--on-accent)}
         .rea-btn-ghost{border-color:transparent;background:none}
+        /* The update button states. accent marks "there is something to pull",
+           danger marks a failed pull — both are tinted outlines rather than
+           filled buttons so they never compete with the primary 引擎 action. */
+        .rea-btn-accent{
+          border-color:rgba(23,108,107,.42);background:var(--accent-soft);color:var(--accent);
+        }
+        .rea-btn-accent:hover{
+          background:var(--accent-soft);border-color:var(--accent);color:var(--accent);
+        }
+        .rea-btn-danger{border-color:rgba(196,74,74,.42);color:var(--down)}
+        .rea-btn-danger:hover{
+          border-color:var(--down);color:var(--down);background:var(--panel-2);
+        }
         .rea-btn-sm{padding:4px 8px;font-size:11px}
         .rea-btn-sm svg{width:12px;height:12px}
         /* An anchor styled as a button must not inherit link decoration, and a
@@ -1491,11 +1505,6 @@ window.__ModuleLoader__.load({
           error: mcpError,
           onStart: onStartMcp,
         }),
-        h(UpdateBanner, {
-          update,
-          onRefresh: onCheckUpdate,
-          busy: updateBusy,
-        }),
         kpiRow,
         h('div', { className: 'rea-cols-2', style: { marginBottom: '13px' } },
           topToolsCard,
@@ -1944,99 +1953,75 @@ window.__ModuleLoader__.load({
      * the whole fix.
      */
     /**
-     * Update notice.
+     * Update button.
      *
-     * A plugin cannot overwrite its own loaded modules, so this never claims to
-     * update itself. It states the version gap, gives the exact command, and
-     * gets out of the way — the honest shape for something that must restart to
-     * change.
+     * Replaces a full-width banner that explained the situation and then handed
+     * the user a `git pull` to type. Two problems with that: it occupied the top
+     * of every overview, and the instruction was the part people skipped.
+     *
+     * Now the Host runs the pull (see `lib/self-update.js` — it knows the
+     * package root and refuses a dirty tree), and this is one small button that
+     * says what state it is in. When the pull lands, the new files are on disk
+     * but the running process still holds the old modules, so the button turns
+     * into the one thing left to do: restart.
+     *
+     * A dot appears only when there is something to act on, so a plugin that is
+     * up to date costs a button and nothing else.
      */
-    function UpdateBanner({ update, onRefresh, busy }) {
-      if (!update) return null;
+    function UpdateButton({ update, result, busy, onRun }) {
+      const behind = update?.gitBehind ?? 0;
+      const phase = result?.phase ?? null;
 
-      const kind = update.installKind?.kind ?? 'unknown';
-
-      /**
-       * When the registry check is off, the banner shows the repository instead:
-       * the user needs to know where the code lives, not which npm version
-       * exists. This is the normal state now.
+      /*
+       * Label and tone come from the last run first: after clicking, the answer
+       * to "did it work" matters more than the stale commit count the check
+       * reported before the click.
        */
-      if (update.skipped) {
-        const behind = update.gitBehind;
+      let label = '更新';
+      let tone = 'ghost';
+      let title = '从 GitHub 拉取最新版本';
+      let dot = false;
 
-        return h('div', {
-          className: 'rea-banner',
-          style: {
-            borderColor: 'rgba(23,108,107,.22)',
-            background: 'var(--accent-soft)',
-            marginBottom: '12px',
-          },
-        },
-          h('span', { className: 'rea-hdot', style: { background: 'var(--accent)' } }),
-          h('div', { style: { flex: 1, minWidth: 0 } },
-            h('div', { className: 'rea-banner-title' },
-              behind > 0
-                ? `代码落后上游 ${behind} 个提交`
-                : '从 GitHub 分发'),
-            h('div', { className: 'rea-banner-body', style: { marginTop: '3px' } },
-              behind > 0
-                ? h('span', null, '在插件目录执行：')
-                : h('span', null, '更新方式：拉取仓库后重启 DSH')),
-            behind > 0
-              ? h('code', {
-                  style: {
-                    display: 'inline-block', marginTop: '4px', padding: '3px 7px',
-                    borderRadius: '4px', background: 'var(--bg)',
-                    fontFamily: 'var(--mono)', fontSize: '10.5px',
-                  },
-                }, 'git pull && npm install')
-              : null,
-            h('span', { style: { display: 'block', marginTop: '4px', fontSize: '10px', color: 'var(--ink-4)' } },
-              'github.com/jiuyou-7411/dsh-rea-plugin')),
-          h('button', {
-            type: 'button',
-            className: 'rea-btn rea-btn-sm rea-btn-ghost',
-            onClick: onRefresh,
-            disabled: busy,
-          }, busy ? '检查中…' : '检查上游'));
+      if (busy) {
+        label = '更新中';
+      } else if (phase === 'done') {
+        label = '已更新';
+        title = `已更新到 ${result?.toVersion ?? '新版本'}，重启 DSH 生效`;
+        dot = true;
+      } else if (phase === 'skipped') {
+        label = '已最新';
+        title = `当前 ${result?.fromVersion ?? update?.current ?? ''} 已是最新版本`;
+      } else if (phase === 'failed') {
+        label = '更新失败';
+        tone = 'danger';
+        title = result?.error ?? '更新失败';
+      } else if (behind > 0) {
+        label = `更新 ${behind}`;
+        tone = 'accent';
+        dot = true;
+        title = `落后上游 ${behind} 个提交，点击拉取`;
+      } else if (update?.skipped) {
+        title = '点击检查并拉取 GitHub 上的最新版本';
       }
 
-      // A dev checkout is not "outdated", it is local: saying otherwise would
-      // tell the author their own working tree is behind.
-      if (kind === 'link' || kind === 'self' || kind === 'git') return null;
-
-      if (!update.available) return null;
-
-      return h('div', {
-        className: 'rea-banner',
-        style: {
-          borderColor: 'rgba(23,108,107,.30)',
-          background: 'var(--accent-soft)',
-          marginBottom: '12px',
-        },
+      return h('button', {
+        type: 'button',
+        className: `rea-btn rea-btn-sm rea-btn-${tone}`,
+        onClick: onRun,
+        disabled: busy,
+        title,
+        'aria-label': title,
       },
-        h('span', { className: 'rea-hdot', style: { background: 'var(--accent)' } }),
-        h('div', { style: { flex: 1, minWidth: 0 } },
-          h('div', { className: 'rea-banner-title' },
-            '有新版本 ' + update.latest + '（当前 ' + update.current + '）'),
-          h('div', { className: 'rea-banner-body', style: { marginTop: '3px' } },
-            h('span', null, '在 DSH profile 目录执行：'),
-            h('code', {
+        busy ? Icon.refresh() : Icon.download(),
+        h('span', { className: 'rea-btn-label' }, label),
+        dot
+          ? h('span', {
               style: {
-                display: 'inline-block', marginTop: '4px', padding: '3px 7px',
-                borderRadius: '4px', background: 'var(--bg)',
-                fontFamily: 'var(--mono)', fontSize: '10.5px',
+                width: '5px', height: '5px', borderRadius: '50%',
+                background: 'var(--accent)', marginLeft: '1px', flex: 'none',
               },
-            }, update.command),
-            h('span', { style: { display: 'block', marginTop: '4px' } },
-              '装完重启 DSH 生效——前端会热重载，Host 端必须重启'))),
-        h('button', {
-          type: 'button',
-          className: 'rea-btn rea-btn-sm rea-btn-ghost',
-          onClick: onRefresh,
-          disabled: busy,
-          title: '重新检查版本',
-        }, busy ? '检查中…' : '重新检查'));
+            })
+          : null);
     }
 
     /**
@@ -2685,6 +2670,50 @@ window.__ModuleLoader__.load({
 
       useEffect(() => { checkUpdate(false); }, [checkUpdate]);
 
+      /**
+       * Pull the plugin forward, in place.
+       *
+       * The old banner told the user to open a terminal and run `git pull`.
+       * Most people do not, and the ones who do often run it in the wrong
+       * directory. The Host can do it correctly — it knows the package root and
+       * can refuse a dirty tree — so the button does it and reports what
+       * happened.
+       *
+       * Nothing here restarts DSH. The new files are on disk; loading them is
+       * the next launch. `restartRequired` in the result is what the button
+       * turns into a visible instruction, because a silent "done" followed by no
+       * change is the worst possible outcome.
+       */
+      const [selfUpdate, setSelfUpdate] = useState(null);
+      const [selfUpdating, setSelfUpdating] = useState(false);
+
+      const runUpdate = useCallback(async () => {
+        if (selfUpdating) return;
+        setSelfUpdating(true);
+        try {
+          const response = await fetch(API.selfUpdate, {
+            method: 'POST',
+            headers: { accept: 'application/json' },
+          });
+          const body = await response.json();
+          if (!mounted.current) return;
+          setSelfUpdate(body);
+          // A finished pull changes the version the banner was reporting, so
+          // refresh the check instead of leaving a stale "behind N commits".
+          if (body?.phase === 'done') checkUpdate(true);
+        } catch (error) {
+          if (mounted.current) {
+            setSelfUpdate({
+              ok: false,
+              phase: 'failed',
+              error: error?.message ?? String(error),
+            });
+          }
+        } finally {
+          if (mounted.current) setSelfUpdating(false);
+        }
+      }, [selfUpdating, checkUpdate]);
+
       // ---- JDK 21 (required by Ghidra) ------------------------------------
       const [jdk, setJdk] = useState(null);
       const [jdkBusy, setJdkBusy] = useState(false);
@@ -3221,6 +3250,12 @@ window.__ModuleLoader__.load({
             h('span', { className: 'rea-stat rea-stat-hide' },
               '平均 ', h('b', { className: 'num' }, `${avg.value}${avg.unit}`)),
             h('span', { className: 'rea-tb-div' }),
+            h(UpdateButton, {
+              update,
+              result: selfUpdate,
+              busy: selfUpdating,
+              onRun: runUpdate,
+            }),
             h('a', {
               className: 'rea-btn rea-btn-sm rea-btn-ghost rea-btn-icon',
               href: 'https://github.com/jiuyou-7411/dsh-rea-plugin',
