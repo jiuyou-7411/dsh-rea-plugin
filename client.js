@@ -1212,7 +1212,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Overview: KPI row, top tools, recent alerts, quick actions. */
-    function OverviewPage({ status, metrics, health, mcpBusy, mcpError, onStartMcp, onGo, update, onCheckUpdate, updateBusy }) {
+    function OverviewPage({ status, metrics, health, mcpBusy, mcpError, onStartMcp, onGo }) {
       const counts = metrics?.counts ?? {};
       const total = counts.total ?? 0;
       const failed = counts.failed ?? 0;
