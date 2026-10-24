@@ -335,7 +335,22 @@ export function apply(ctx, config = {}) {
   ctx.inject(['webServer'], (scoped) => {
     scoped.effect(() => {
       try {
-        api.attach(scoped.webServer, { telemetry, tools: scoped.tools });
+        const attached = api.attach(scoped.webServer, { telemetry, tools: scoped.tools });
+        /*
+         * `attach` no longer throws on a bad route. One duplicate path used to
+         * abort the loop and leave the panel with no routes at all, which reads
+         * as "plugin broken" with no clue why. It reports what failed instead,
+         * and that report belongs in the Host log — a partially attached
+         * workbench is still a defect worth seeing.
+         */
+        if (attached?.failed?.length) {
+          const detail = attached.failed
+            .map((entry) => `${entry.method} ${entry.path}: ${entry.error}`)
+            .join('；');
+          scoped.logger?.error?.(
+            `[rea] ${attached.failed.length} 条路由注册失败（${attached.registered} 条已就绪）：${detail}`,
+          );
+        }
       } catch (error) {
         // A route failure must be loud: without these routes the panel can only
         // show "not connected", which is exactly the symptom of this bug.
