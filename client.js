@@ -1643,10 +1643,50 @@ window.__ModuleLoader__.load({
       // One key at a time: two expanded payloads side by side is unreadable.
       const [openKey, setOpenKey] = useState(null);
 
+      /*
+       * `target_unavailable` is not a fault.
+       *
+       * Every REA tool works against the currently opened target, so calling
+       * any of them before `open_binary` produces this same error — dozens of
+       * times, in a row, all red. Without a word of context that reads as
+       * "the plugin is broken", which is the wrong conclusion and a costly one
+       * to reach. Count them separately and say what is actually missing.
+       */
+      const noTargetGroups = errors.filter((g) =>
+        /target_unavailable|No app is open/i.test(g.message ?? ''));
+      const noTargetCalls = noTargetGroups.reduce((n, g) => n + (g.count ?? 0), 0);
+      const realGroups = errors.length - noTargetGroups.length;
+
       return h('div', { className: 'rea-cols-2' },
         h('div', null,
           h('div', { className: 'rea-sec-label' },
             `错误聚合${errors.length > 0 ? ` · ${errors.length} 类` : ''}`),
+
+          noTargetCalls > 0
+            ? h('div', {
+                className: 'rea-card',
+                style: {
+                  marginBottom: '8px', padding: '10px 12px',
+                  borderLeft: '3px solid var(--warn, #d29922)',
+                },
+              },
+                h('div', {
+                  style: { fontSize: '12px', fontWeight: 700, marginBottom: '4px' },
+                }, `其中 ${noTargetCalls} 次不是故障：还没打开目标文件`),
+                h('div', {
+                  style: {
+                    fontSize: '11px', color: 'var(--ink-3)', lineHeight: '1.6',
+                  },
+                }, '逆向工具都针对「当前打开的目标」工作。先打开一个文件，'
+                  + '再调用分析工具，这批错误就不会再出现。'),
+                realGroups > 0
+                  ? h('div', {
+                      style: {
+                        fontSize: '11px', color: 'var(--ink-4)', marginTop: '4px',
+                      },
+                    }, `另有 ${realGroups} 类其它错误，见下方。`)
+                  : null)
+            : null,
 
           errors.length === 0
             ? h('div', { className: 'rea-card' },
