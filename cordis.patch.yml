@@ -37,3 +37,27 @@
         # empty to let the Host discover the engines it installed; set a value
         # here to pin an engine that lives somewhere else.
         providerEnv: {}
+        # ── Tool definition size ────────────────────────────────────────────
+        #
+        # Tool schemas are injected into the system prompt on every request.
+        # REA's 207 definitions measured 772,945 characters (about 215k tokens)
+        # as published upstream, because a few tools inline entire data
+        # structures — `compare_web_captures` alone is 166 KB. Compaction trims
+        # each description to its first sentence and caps schema nesting:
+        #
+        #   raw                          ≈ 215k tokens
+        #   compactToolSchemas: true     ≈  60k tokens   (default, -72%)
+        #   toolSchemaDepth: 2           ≈  45k tokens   (-79%)
+        #
+        # What is lost: the interior fields of deeply nested parameters. The
+        # model still sees that a value goes there, and the exact shape is in the
+        # offline docs (`rea_docs`) or in the tool's own validation error. What
+        # is kept: every tool name, its one-line purpose, and the top-level
+        # parameters with their required list.
+        compactToolSchemas: true
+        # How many levels of parameters to describe. 3 keeps real structure;
+        # 2 is tighter; set compactToolSchemas: false to disable compaction
+        # entirely and pay the full cost.
+        toolSchemaDepth: 3
+        # Characters of each tool description to keep. 0 keeps everything.
+        toolDescriptionChars: 160

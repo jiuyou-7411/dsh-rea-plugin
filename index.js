@@ -71,6 +71,13 @@ export function apply(ctx, config = {}) {
     autoInstallProviders: config?.autoInstallProviders !== false,
     maxProviderDownloadMb: Number(config?.maxProviderDownloadMb ?? 2048),
     providerEnv: config?.providerEnv ?? {},
+    // How much of each tool definition reaches the system prompt. Defaults keep
+    // the 207 definitions at roughly 43k tokens instead of 215k.
+    toolShape: {
+      compact: config?.compactToolSchemas !== false,
+      maxDepth: Number(config?.toolSchemaDepth ?? 3),
+      maxDescriptionChars: Number(config?.toolDescriptionChars ?? 160),
+    },
   };
 
   /**
@@ -250,6 +257,7 @@ export function apply(ctx, config = {}) {
   };
 
   const mcpBridge = attachMcpBridge(ctx, mcpClient, {
+    shape: resolved.toolShape,
     onState(next) {
       mcpStatus = {
         ...mcpStatus,

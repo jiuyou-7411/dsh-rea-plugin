@@ -1280,6 +1280,27 @@ window.__ModuleLoader__.load({
           })(),
           onClick: missingNames.length > 0 && onGo ? () => onGo('engines') : undefined,
         }),
+        /*
+         * Tool definitions are not part of the conversation, so their context
+         * cost is invisible exactly where someone would look for it. REA's 207
+         * schemas measured 215k tokens before compaction — enough to crowd out
+         * the actual analysis. Surfacing it here makes the trade visible and
+         * keeps it from silently growing again.
+         */
+        (() => {
+          const tc = status?.toolContext;
+          if (!tc?.available) return null;
+          const k = tc.tokens >= 1000 ? (tc.tokens / 1000).toFixed(1) : String(tc.tokens);
+          const unit = tc.tokens >= 1000 ? 'k token' : 'token';
+          return h(Kpi, {
+            icon: Icon.chart,
+            iconClass: 'rea-chip-accent',
+            label: '工具定义占用',
+            value: k,
+            unit,
+            foot: `REA ${Math.round(tc.reaTokens / 1000)}k · 其他 ${Math.round(tc.otherTokens / 1000)}k（估算）`,
+          });
+        })(),
         h(Kpi, {
           icon: Icon.wave,
           iconClass: 'rea-chip-accent',
