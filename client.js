@@ -971,6 +971,11 @@ window.__ModuleLoader__.load({
       refresh: () => h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round' },
         h('polyline', { points: '23 4 23 10 17 10' }),
         h('path', { d: 'M20.49 15a9 9 0 1 1-2.12-9.36L23 10' })),
+      /* Down-arrow into a tray: the update button's idle state. */
+      download: () => h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M12 3v12' }),
+        h('polyline', { points: '7 10 12 15 17 10' }),
+        h('path', { d: 'M4 19h16' })),
       pause: () => h('svg', { viewBox: '0 0 24 24', fill: 'currentColor' },
         h('rect', { x: 6, y: 4, width: 4, height: 16 }),
         h('rect', { x: 14, y: 4, width: 4, height: 16 })),

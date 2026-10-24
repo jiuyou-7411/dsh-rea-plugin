@@ -1,6 +1,6 @@
 {
   "name": "dsh-rea-plugin",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "private": false,
   "type": "module",
   "description": "REA 逆向工作台 for DeepSeek Harness：220 个工具（207 个上游 MCP 工具 + 6 个 MobileRE 动态分析 + 7 个本地工具）、72 篇离线文档、4 个 Agent 技能，引擎与 JDK 可一键安装，带热更新检查。",
@@ -71,9 +71,10 @@
     "sync:docs": "node scripts/vendor-docs.mjs",
     "sync:all": "npm run sync:rea-skills && npm run sync:doc-index && npm run sync:docs && npm run build:skills",
     "build:skills": "node scripts/build-skills.mjs",
-    "verify": "node scripts/verify-package.mjs",
+    "verify": "node scripts/check-client.mjs && node scripts/verify-package.mjs",
     "publish": "node scripts/publish.mjs",
-    "publish:dry": "node scripts/publish.mjs --dry-run"
+    "publish:dry": "node scripts/publish.mjs --dry-run",
+    "check:client": "node scripts/check-client.mjs"
   },
   "repository": {
     "type": "git",

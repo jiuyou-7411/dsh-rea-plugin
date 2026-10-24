@@ -45,6 +45,11 @@ jobs:
         with:
           node-version: '22'
 
+      # check-client.mjs 抓语法检查看不到的引用错误：Icon 拼错、路由路径重复、
+      # 客户端调用了 Host 未注册的接口。这三类都曾让面板整页空白。
+      - name: 客户端静态检查
+        run: node scripts/check-client.mjs
+
       # verify-package.mjs 断言的是「装完能不能用」：文档树在不在、
       # lib 里的关键模块在不在、package.json 的字段齐不齐。
       - name: 运行打包前检查
