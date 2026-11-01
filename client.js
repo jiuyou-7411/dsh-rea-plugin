@@ -1692,10 +1692,54 @@ window.__ModuleLoader__.load({
       const noTargetCalls = noTargetGroups.reduce((n, g) => n + (g.count ?? 0), 0);
       const realGroups = errors.length - noTargetGroups.length;
 
+      /*
+       * Split this plugin's failures from every other plugin's.
+       *
+       * The panel reads the Host's whole tool registry, so it also sees `pwsh`
+       * losing its working directory and a web search missing its API key. On a
+       * live profile that was 27 of 33 recorded failures — all of them unrelated
+       * to REA, and all of them making this panel look broken.
+       *
+       * Nothing is hidden: the other count is stated, so a real cross-plugin
+       * problem is still visible. It just stops being counted as this plugin's.
+       */
+      const isReaTool = (name) => {
+        const raw = String(name ?? '');
+        return raw.startsWith('mcp__rea__')
+          || /^(rea_|mobile_|mobile|rea)(_|$)/.test(raw)
+          || raw === 'rea';
+      };
+      const otherGroups = errors.filter((g) => !isReaTool(g.tool));
+      const otherCalls = otherGroups.reduce((n, g) => n + (g.count ?? 0), 0);
+      const reaGroups = errors.length - otherGroups.length;
+
       return h('div', { className: 'rea-cols-2' },
         h('div', null,
           h('div', { className: 'rea-sec-label' },
-            `错误聚合${errors.length > 0 ? ` · ${errors.length} 类` : ''}`),
+            `错误聚合${errors.length > 0 ? ` · ${errors.length} 类` : ''}`
+            + (otherGroups.length > 0
+              ? `（REA ${reaGroups} 类 · 其它插件 ${otherGroups.length} 类）`
+              : '')),
+
+          otherCalls > 0
+            ? h('div', {
+                className: 'rea-card',
+                style: {
+                  marginBottom: '8px', padding: '10px 12px',
+                  borderLeft: '3px solid var(--ink-4)',
+                },
+              },
+                h('div', {
+                  style: { fontSize: '12px', fontWeight: 700, marginBottom: '4px' },
+                }, `其中 ${otherCalls} 次失败来自其它插件，不是 REA`),
+                h('div', {
+                  style: {
+                    fontSize: '11px', color: 'var(--ink-3)', lineHeight: '1.6',
+                  },
+                }, `涉及 ${otherGroups.map((g) => g.toolLabel ?? g.tool).slice(0, 6).join('、')}`
+                  + (otherGroups.length > 6 ? ' 等' : '')
+                  + '。这些是其它插件或工具的报错，不影响 REA 的分析能力。'))
+            : null,
 
           noTargetCalls > 0
             ? h('div', {
