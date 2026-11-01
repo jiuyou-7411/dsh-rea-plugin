@@ -363,17 +363,33 @@ export function apply(ctx, config = {}) {
   /*
    * Team state for the panel.
    *
-   * The `agentTeams` service is experimental and may not be mounted, so both
-   * lookups are optional and the view degrades to "derive from tool arguments"
-   * rather than blanking. `agents.currentInitiator()` only resolves inside a tool
-   * call, which is why `refresh()` is driven from the telemetry hook below rather
-   * than from the HTTP route.
+   * Both services are captured through `ctx.inject` rather than declared in the
+   * static `inject` array. `agentTeams` is an experimental package: declaring it
+   * required would stop this plugin loading on a profile that does not mount it,
+   * and touching `ctx.agentTeams` without injecting it yields nothing — which is
+   * exactly the bug that made the team page report "服务未挂载" while the service
+   * was active. `ctx.inject` runs its callback when the service appears and
+   * disposes when it goes away, so the panel follows the real state.
+   *
+   * `agents.currentInitiator()` only resolves inside a tool call, which is why
+   * `refresh()` is driven from the telemetry hook rather than the HTTP route.
    */
+  let teamsService = null;
+  let agentsService = null;
+
+  ctx.inject(['agentTeams'], (scoped) => {
+    teamsService = scoped.agentTeams ?? null;
+    return () => { teamsService = null; };
+  });
+
+  ctx.inject(['agents'], (scoped) => {
+    agentsService = scoped.agents ?? null;
+    return () => { agentsService = null; };
+  });
+
   const teamView = createTeamView({
-    // Property access with a guard: a service that is not mounted is simply
-    // undefined, and touching an unknown key on ctx can throw on a strict proxy.
-    getTeams: () => { try { return ctx.agentTeams ?? null; } catch { return null; } },
-    getAgents: () => { try { return ctx.agents ?? null; } catch { return null; } },
+    getTeams: () => teamsService,
+    getAgents: () => agentsService,
   });
   resolved.teamStatus = () => teamView.snapshot();
 

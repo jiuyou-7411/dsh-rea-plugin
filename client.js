@@ -1351,13 +1351,24 @@ window.__ModuleLoader__.load({
           if (!tc?.available) return null;
           const k = tc.tokens >= 1000 ? (tc.tokens / 1000).toFixed(1) : String(tc.tokens);
           const unit = tc.tokens >= 1000 ? 'k token' : 'token';
+          /*
+           * Say whose cost this is. After the fusion the plugin registers one
+           * tool, so its share is small and the total is dominated by every other
+           * installed plugin — a bare total would read as "REA still costs 24k".
+           */
+          const own = tc.reaTokens >= 1000
+            ? `${(tc.reaTokens / 1000).toFixed(1)}k`
+            : String(tc.reaTokens);
+          const others = tc.otherTokens >= 1000
+            ? `${(tc.otherTokens / 1000).toFixed(1)}k`
+            : String(tc.otherTokens);
           return h(Kpi, {
             icon: Icon.chart,
             iconClass: 'rea-chip-accent',
             label: '工具定义占用',
             value: k,
             unit,
-            foot: `REA ${Math.round(tc.reaTokens / 1000)}k · 其他 ${Math.round(tc.otherTokens / 1000)}k（估算）`,
+            foot: `本插件 ${own} · 其他插件 ${others}（估算）`,
           });
         })(),
         h(Kpi, {
