@@ -71,12 +71,25 @@ export function apply(ctx, config = {}) {
     autoInstallProviders: config?.autoInstallProviders !== false,
     maxProviderDownloadMb: Number(config?.maxProviderDownloadMb ?? 2048),
     providerEnv: config?.providerEnv ?? {},
-    // How much of each tool definition reaches the system prompt. Defaults keep
-    // the 207 definitions at roughly 43k tokens instead of 215k.
+    // How much of each tool definition reaches the system prompt, and which
+    // tools are registered at all. See `transport` below.
     toolShape: {
       compact: config?.compactToolSchemas !== false,
       maxDepth: Number(config?.toolSchemaDepth ?? 3),
       maxDescriptionChars: Number(config?.toolDescriptionChars ?? 160),
+      /*
+       * How REA is reached.
+       *
+       * 'hybrid' (default) registers 17 core tools — about 4,003 tokens — and
+       * leaves the long tail to `rea_cli`. 'mcp' registers all 207 (59,551
+       * tokens measured). 'cli' registers none.
+       *
+       * Hybrid is the default because 99 of the 207 tools have no CLI
+       * equivalent at all, so pure CLI loses them, while registering all 207
+       * costs about 60k tokens in every session whether or not the session
+       * touches REA.
+       */
+      transport: ['cli', 'hybrid', 'mcp'].includes(config?.transport) ? config.transport : 'hybrid',
     },
   };
 
@@ -284,6 +297,11 @@ export function apply(ctx, config = {}) {
     state: mcpBridge.state,
     error: mcpBridge.error,
     serverInfo: mcpBridge.serverInfo,
+    // Which access mode is active, and how many tools upstream offered before
+    // this mode narrowed them. The panel shows both so "17 个工具" never reads
+    // as "the plugin lost 190 tools".
+    transport: mcpBridge.transport,
+    upstreamCount: mcpBridge.upstreamCount,
   });
 
   ctx.effect(() => () => { void mcpBridge.stop(); });

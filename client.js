@@ -1295,7 +1295,20 @@ window.__ModuleLoader__.load({
           foot: (() => {
             const b = status?.toolBreakdown;
             if (!b) return `${engines.length} 个引擎全部就绪`;
-            return `REA ${b.rea} · 移动端 ${b.mobile} · 本地 ${b.local}`;
+            /*
+             * Say which access mode is on, and how many tools upstream has.
+             *
+             * In hybrid mode the REA count is 17, not 207 — without the mode and
+             * the upstream total beside it, "REA 17" reads as "190 tools went
+             * missing" rather than "190 tools are reached through the CLI".
+             */
+            const mcp = status?.mcp;
+            const upstream = mcp?.upstreamCount;
+            const mode = mcp?.transport;
+            const reaPart = mode && mode !== 'mcp' && upstream
+              ? `REA ${b.rea}/${upstream}（${mode === 'cli' ? '命令行' : '混合'}）`
+              : `REA ${b.rea}`;
+            return `${reaPart} · 移动端 ${b.mobile} · 本地 ${b.local}`;
           })(),
           onClick: missingNames.length > 0 && onGo ? () => onGo('engines') : undefined,
         }),

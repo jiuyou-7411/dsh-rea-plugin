@@ -61,3 +61,24 @@
         toolSchemaDepth: 3
         # Characters of each tool description to keep. 0 keeps everything.
         toolDescriptionChars: 160
+        # ── 接入方式 ────────────────────────────────────────────────────────
+        #
+        # REA 有两条通道：MCP（工具带 schema，模型不会拼错）和 CLI
+        # （`rea_cli` 跑 `rea <子命令> <路径>`，无状态、可并行、零 schema）。
+        #
+        # 实测（207 个工具）：
+        #   transport: mcp      注册 207 个  ≈ 59,551 token
+        #   transport: hybrid   注册  17 个  ≈  4,003 token   ← 默认
+        #   transport: cli      注册   0 个  ≈      0 token
+        #
+        # 为什么默认 hybrid 而不是 cli：207 个工具里有 99 个**没有** CLI 对应
+        # （Hopper GUI 操作、compare_* 系列、reconstruction ledger 等），
+        # 纯 CLI 会丢功能；而全量注册的 60k token 是每个会话都要付的，
+        # 不管你这一轮做不做逆向。
+        #
+        # hybrid 保留 17 个高频工具（打开目标、分析、反编译、交叉引用、
+        # 各类 inspect_*），长尾走 rea_cli。切换不需要改代码。
+        #
+        # cli 模式下唯一的 REA 入口是 rea_cli，模型靠 `rea-cli` 技能里的
+        # 路由表知道该用哪条命令 —— 该技能随插件自动安装。
+        transport: hybrid
