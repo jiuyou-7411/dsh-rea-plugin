@@ -20,6 +20,7 @@
 import { buildTools } from './lib/tools.js';
 import { createApiRoutes } from './lib/api.js';
 import { ReaTelemetry, attachTelemetry } from './lib/telemetry.js';
+import { createTeamView } from './lib/team-view.js';
 import { CACHE_ROOT, REA_AGENTS_VERSION, providerEnvironment, readConfiguredProviderEnv } from './lib/providers.js';
 import { createMcpClient, attachMcpBridge } from './lib/mcp-bridge.js';
 import { buildMobileTools } from './lib/tools-mobile.js';
@@ -358,8 +359,26 @@ export function apply(ctx, config = {}) {
   // observational, so it must never be able to stop the workbench from loading.
   // -------------------------------------------------------------------------
   const telemetry = new ReaTelemetry({ maxEntries: Number(resolved.telemetryEntries ?? 500) });
+
+  /*
+   * Team state for the panel.
+   *
+   * The `agentTeams` service is experimental and may not be mounted, so both
+   * lookups are optional and the view degrades to "derive from tool arguments"
+   * rather than blanking. `agents.currentInitiator()` only resolves inside a tool
+   * call, which is why `refresh()` is driven from the telemetry hook below rather
+   * than from the HTTP route.
+   */
+  const teamView = createTeamView({
+    // Property access with a guard: a service that is not mounted is simply
+    // undefined, and touching an unknown key on ctx can throw on a strict proxy.
+    getTeams: () => { try { return ctx.agentTeams ?? null; } catch { return null; } },
+    getAgents: () => { try { return ctx.agents ?? null; } catch { return null; } },
+  });
+  resolved.teamStatus = () => teamView.snapshot();
+
   try {
-    ctx.effect(() => attachTelemetry(ctx, telemetry));
+    ctx.effect(() => attachTelemetry(ctx, telemetry, { teamView }));
   } catch (error) {
     ctx.logger?.warn?.(`[rea] telemetry unavailable: ${error?.message ?? error}`);
   }

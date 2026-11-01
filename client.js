@@ -36,6 +36,7 @@ window.__ModuleLoader__.load({
 
     const API = {
       status: '/api/dsh-plugin-rea/status',
+      team: '/api/dsh-plugin-rea/team',
       health: '/api/dsh-plugin-rea/health',
       metrics: '/api/dsh-plugin-rea/metrics',
       events: '/api/dsh-plugin-rea/events',
@@ -1707,6 +1708,171 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * Team: who is on the team, and what they were told to do.
+     *
+     * This page is the half the CLI-only distribution cannot offer. Their team
+     * runs in parallel and the operator sees it as a scroll of chat messages; here
+     * the roster and the task board are one glance, and every REA call each
+     * member made lands in 实时流 with its command, duration and error.
+     *
+     * `available: false` is the normal state when the experimental agent-team
+     * service is not mounted, so it renders an explanation rather than an error.
+     */
+    function TeamPage({ team, onGo }) {
+      const members = team?.members ?? [];
+      const tasks = team?.tasks ?? [];
+      const available = team?.available === true;
+
+      const statusTone = (status) => {
+        const s = String(status ?? '').toLowerCase();
+        if (s === 'running' || s === 'active' || s === 'busy') return 'ok';
+        if (s === 'failed' || s === 'error' || s === 'cancelled') return 'down';
+        if (s === 'provisioning' || s === 'starting' || s === 'spawned') return 'warn';
+        return 'idle';
+      };
+
+      const dotFor = (tone) => ({
+        ok: 'var(--up, #3fb950)',
+        warn: 'var(--warn, #d29922)',
+        down: 'var(--down, #c44a4a)',
+        idle: 'var(--ink-4)',
+      }[tone]);
+
+      if (!available) {
+        return h('div', { className: 'rea-card' },
+          h(Empty, {
+            icon: Icon.target,
+            title: '没有启用智能体团队',
+            body: (team?.reason ? `${team.reason}。` : '')
+              + '团队需要 DSH 的 agent-team 服务。装好之后，'
+              + '用「REA 逆向工作台」预设新建会话，就能让 Lead 派成员并行分析多个目标。',
+          }));
+      }
+
+      const memberCard = h('div', { className: 'rea-card' },
+        h('div', { className: 'rea-card-hd' },
+          h('h3', null, '团队成员'),
+          h('span', { className: 'sub' }, `${members.length} 人`)),
+        h('div', { className: 'rea-card-bd' },
+          members.length === 0
+            ? h(Empty, {
+                icon: Icon.target,
+                title: '还没有成员',
+                body: '在 rea 预设的会话里让 Lead 用 spawn_teammate 派活，成员会出现在这里。',
+              })
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                members.map((m, i) => h('div', {
+                  key: m.id || m.name || i,
+                  style: {
+                    display: 'flex', alignItems: 'flex-start', gap: '8px',
+                    padding: '7px 9px', borderRadius: '6px',
+                    background: 'var(--panel-2)',
+                  },
+                },
+                  h('span', {
+                    style: {
+                      width: '6px', height: '6px', borderRadius: '50%',
+                      background: dotFor(statusTone(m.status)),
+                      marginTop: '5px', flex: 'none',
+                    },
+                  }),
+                  h('div', { style: { flex: 1, minWidth: 0 } },
+                    h('div', {
+                      style: { fontSize: '12px', fontWeight: 700 },
+                    }, m.name, m.isLead
+                      ? h('span', {
+                          style: {
+                            marginLeft: '6px', fontSize: '9.5px', fontWeight: 400,
+                            color: 'var(--ink-4)',
+                          },
+                        }, 'Lead')
+                      : null),
+                    m.description
+                      ? h('div', {
+                          style: {
+                            fontSize: '10.5px', color: 'var(--ink-3)',
+                            lineHeight: '1.5', marginTop: '2px',
+                          },
+                        }, m.description)
+                      : null),
+                  h('span', {
+                    style: {
+                      fontSize: '10px', color: 'var(--ink-4)',
+                      fontFamily: 'var(--mono)', flex: 'none',
+                    },
+                  }, m.status))))));
+
+      const taskCard = h('div', { className: 'rea-card' },
+        h('div', { className: 'rea-card-hd' },
+          h('h3', null, '任务板'),
+          h('span', { className: 'sub' }, `${tasks.length} 个`)),
+        h('div', { className: 'rea-card-bd' },
+          tasks.length === 0
+            ? h(Empty, {
+                icon: Icon.check,
+                title: '还没有任务',
+                body: 'Lead 用 team_task_create 建任务后，进度会显示在这里。',
+              })
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                tasks.map((t, i) => h('div', {
+                  key: `${t.subject}-${i}`,
+                  style: {
+                    padding: '7px 9px', borderRadius: '6px',
+                    background: 'var(--panel-2)',
+                    borderLeft: `3px solid ${dotFor(statusTone(t.status))}`,
+                  },
+                },
+                  h('div', {
+                    style: { display: 'flex', gap: '8px', alignItems: 'baseline' },
+                  },
+                    h('span', {
+                      style: { fontSize: '12px', fontWeight: 700, flex: 1, minWidth: 0 },
+                    }, t.subject),
+                    h('span', {
+                      style: {
+                        fontSize: '10px', color: 'var(--ink-4)',
+                        fontFamily: 'var(--mono)', flex: 'none',
+                      },
+                    }, t.status)),
+                  t.description
+                    ? h('div', {
+                        style: {
+                          fontSize: '10.5px', color: 'var(--ink-3)',
+                          lineHeight: '1.5', marginTop: '2px',
+                        },
+                      }, t.description)
+                    : null,
+                  (t.owner || t.blockedBy?.length)
+                    ? h('div', {
+                        style: {
+                          fontSize: '10px', color: 'var(--ink-4)', marginTop: '3px',
+                        },
+                      },
+                        t.owner ? `负责人 ${t.owner}` : '',
+                        t.blockedBy?.length
+                          ? `${t.owner ? ' · ' : ''}等 ${t.blockedBy.length} 个前置`
+                          : '')
+                    : null)))));
+
+      return h('div', null,
+        h('div', { className: 'rea-cols-2' }, memberCard, taskCard),
+        h('div', { className: 'rea-card', style: { marginTop: '10px' } },
+          h('div', { className: 'rea-card-bd' },
+            h('div', {
+              style: { fontSize: '11px', color: 'var(--ink-3)', lineHeight: '1.7' },
+            }, '每个成员跑的 REA 命令都会进「实时流」，按命令分组显示耗时与错误。'
+              + '成员并行分析不同目标时，这里能看到谁在做什么、卡在哪里。'),
+            onGo
+              ? h('button', {
+                  type: 'button',
+                  className: 'rea-btn rea-btn-sm rea-btn-ghost',
+                  style: { marginTop: '8px' },
+                  onClick: () => onGo('stream'),
+                }, '看实时流')
+              : null)));
+    }
+
     /** Errors: grouped failures, ranked tools, and a time histogram. */
     function ErrorsPage({ metrics, onReset }) {
       const errors = metrics?.errors ?? [];
@@ -2639,6 +2805,8 @@ window.__ModuleLoader__.load({
 
     const TABS = [
       { key: 'overview', label: '总览', icon: Icon.grid },
+      // Only shown when the agent-team service is mounted; see `tabs` below.
+      { key: 'team', label: '团队', icon: Icon.target, optional: true },
       { key: 'stream', label: '实时流', icon: Icon.wave },
       { key: 'errors', label: '错误', icon: Icon.alert },
       { key: 'health', label: '服务状态', icon: Icon.chart },
@@ -2650,6 +2818,15 @@ window.__ModuleLoader__.load({
       const [status, setStatus] = useState(null);
       const [statusError, setStatusError] = useState(null);
       const [tab, setTab] = useState('overview');
+
+      /*
+       * Team roster and tasks.
+       *
+       * Polled alongside status rather than pushed: the Host refreshes the view
+       * from the telemetry hook (the only place the current Agent resolves), so
+       * this is a cheap read of an already-computed snapshot.
+       */
+      const [team, setTeam] = useState(null);
 
       // Engine jobs, keyed by engine id.
       const [jobs, setJobs] = useState({});
@@ -2699,6 +2876,28 @@ window.__ModuleLoader__.load({
       }, []);
 
       useEffect(() => { loadStatus(); }, [loadStatus]);
+
+      /**
+       * Read the team snapshot.
+       *
+       * A 404 or `available: false` is not an error: the agent-team packages are
+       * experimental and a profile without them simply has no team page. Failures
+       * are swallowed on purpose — a panel that shouts because an optional
+       * feature is absent is worse than one that quietly hides it.
+       */
+      const loadTeam = useCallback(async () => {
+        try {
+          const response = await fetch(API.team, { headers: { accept: 'application/json' } });
+          if (!response.ok) return;
+          const body = await response.json();
+          if (!mounted.current || !body?.ok) return;
+          setTeam(body);
+        } catch {
+          // Optional feature; stay silent.
+        }
+      }, []);
+
+      useEffect(() => { loadTeam(); }, [loadTeam]);
 
       const [mcpBusy, setMcpBusy] = useState(false);
 
@@ -3303,7 +3502,7 @@ window.__ModuleLoader__.load({
             })),
 
           h('nav', { className: 'rea-tabs', role: 'tablist' },
-            TABS.map((entry) => {
+            TABS.filter((entry) => !entry.optional || team?.available === true).map((entry) => {
               const badge = badges[entry.key];
               const tone = badgeTones[entry.key];
               return h('button', {
@@ -3367,10 +3566,11 @@ window.__ModuleLoader__.load({
                 mcpError,
                 onStartMcp: startMcp,
                 onGo: setTab,
-                update,
-                onCheckUpdate: () => checkUpdate(true),
-                updateBusy,
               })
+            : null,
+
+          tab === 'team'
+            ? h(TeamPage, { team, onGo: setTab })
             : null,
 
           tab === 'stream'
