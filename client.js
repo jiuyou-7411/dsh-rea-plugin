@@ -68,6 +68,15 @@ window.__ModuleLoader__.load({
     /** Metrics refresh cadence while a stream is open. */
     const METRICS_POLL_MS = 3000;
 
+    /**
+     * Team snapshot cadence.
+     *
+     * Slower than the rest: a roster changes when someone is spawned or finishes,
+     * which is seconds-to-minutes, and the Host only refreshes the snapshot from
+     * inside a tool call anyway.
+     */
+    const TEAM_POLL_MS = 5000;
+
     /** Rows the panel keeps for the stream view. */
     const STREAM_LIMIT = 200;
 
@@ -448,8 +457,18 @@ window.__ModuleLoader__.load({
         }
 
         /* ── KPI row ────────────────────────────────────────── */
+        /*
+         * Six tiles: 服务状态 · 已加载工具 · 工具定义占用 · 本次调用 ·
+         * REA 失败 · 成功率.
+         *
+         * auto-fit rather than a fixed column count. A hardcoded count has to be
+         * kept in step with the tile list, and it was not: adding 工具定义占用
+         * to a five-column row pushed the sixth tile onto its own line, which is
+         * what made the row look broken. auto-fit sizes to whatever is present
+         * and however wide the panel is.
+         */
         .rea-kpis{
-          display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(0,1.35fr);
+          display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
           gap:11px;margin-bottom:13px;
         }
         .rea-kpi{
@@ -1769,8 +1788,11 @@ window.__ModuleLoader__.load({
           members.length === 0
             ? h(Empty, {
                 icon: Icon.target,
-                title: '还没有成员',
-                body: '在 rea 预设的会话里让 Lead 用 spawn_teammate 派活，成员会出现在这里。',
+                title: team?.awaitingAgent ? '团队服务已就绪' : '还没有成员',
+                body: team?.awaitingAgent
+                  ? '第一次工具调用之后就能读到成员列表。'
+                    + '在 rea 预设的会话里让 Lead 用 spawn_teammate 派活，成员会出现在这里。'
+                  : '在 rea 预设的会话里让 Lead 用 spawn_teammate 派活，成员会出现在这里。',
               })
             : h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
                 members.map((m, i) => h('div', {
@@ -3303,6 +3325,23 @@ window.__ModuleLoader__.load({
         );
         return () => clearInterval(timer);
       }, [tab, loadMonitoring]);
+
+      /*
+       * Poll the team snapshot.
+       *
+       * One read at mount is not enough: the Host can only fill the snapshot from
+       * inside a tool call (that is where the current Agent resolves), so on a
+       * fresh start the first answer is "service up, no data yet". Without a poll
+       * the tab stays hidden until the operator happens to refresh the page after
+       * running a tool — which reads as "the team feature does not exist".
+       *
+       * Slower than the status poll on purpose: a roster changes on the order of
+       * seconds to minutes, not milliseconds.
+       */
+      useEffect(() => {
+        const timer = setInterval(loadTeam, TEAM_POLL_MS);
+        return () => clearInterval(timer);
+      }, [loadTeam]);
 
       // ---- jobs -----------------------------------------------------------
       const pollJob = useCallback(async (engineId) => {
