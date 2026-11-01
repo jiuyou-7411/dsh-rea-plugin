@@ -144,6 +144,33 @@ window.__ModuleLoader__.load({
       rea_capability_matrix: '能力矩阵',
     };
 
+    /**
+     * Short display name for a tool id.
+     *
+     * Three shapes reach the panel now: `mcp__rea__analyze_function` from an
+     * older registration, `rea:analyze` from the unified tool's per-command
+     * records, and plain names like `win_bash`. The prefix is noise in a list, so
+     * it comes off and the command itself is what shows — otherwise every REA row
+     * would read "rea" and the ranking would say nothing.
+     */
+    function shortToolName(name) {
+      const raw = String(name ?? '');
+      if (raw.startsWith('mcp__rea__')) return raw.slice('mcp__rea__'.length).replace(/_/g, ' ');
+      if (raw.startsWith('rea:')) return raw.slice('rea:'.length).replace(/-/g, ' ');
+      if (raw.startsWith('mobile_')) return raw.slice('mobile_'.length);
+      return raw;
+    }
+
+    /** True for anything this plugin owns, in any of the id shapes above. */
+    function isReaToolId(name) {
+      const raw = String(name ?? '');
+      return raw === 'rea'
+        || raw.startsWith('rea:')
+        || raw.startsWith('mcp__rea__')
+        || raw.startsWith('rea_')
+        || raw.startsWith('mobile_');
+    }
+
     const ENGINES = {
       ghidra: {
         label: 'Ghidra',
@@ -1296,18 +1323,17 @@ window.__ModuleLoader__.load({
             const b = status?.toolBreakdown;
             if (!b) return `${engines.length} 个引擎全部就绪`;
             /*
-             * Say which access mode is on, and how many tools upstream has.
+             * One entry tool, whole-catalogue reach.
              *
-             * In hybrid mode the REA count is 17, not 207 — without the mode and
-             * the upstream total beside it, "REA 17" reads as "190 tools went
-             * missing" rather than "190 tools are reached through the CLI".
+             * `rea` is a single registered tool that routes each command to the
+             * stateless CLI or to the MCP server. Reporting "REA 1" alone would
+             * read as "199 capabilities went missing", so the reach is stated
+             * beside it: one tool, N capabilities.
              */
-            const mcp = status?.mcp;
-            const upstream = mcp?.upstreamCount;
-            const mode = mcp?.transport;
-            const reaPart = mode && mode !== 'mcp' && upstream
-              ? `REA ${b.rea}/${upstream}（${mode === 'cli' ? '命令行' : '混合'}）`
-              : `REA ${b.rea}`;
+            const reach = b.reaReach ?? status?.mcp?.upstreamCount ?? 0;
+            const reaPart = reach > 0
+              ? `REA 入口 ${b.rea} 个 · 覆盖 ${reach} 项`
+              : `REA 入口 ${b.rea} 个`;
             return `${reaPart} · 移动端 ${b.mobile} · 本地 ${b.local}`;
           })(),
           onClick: missingNames.length > 0 && onGo ? () => onGo('engines') : undefined,
@@ -1389,13 +1415,11 @@ window.__ModuleLoader__.load({
             : h('div', { className: 'rea-rank' },
                 topTools.map((tool, index) => {
                   const zh = TOOL_LABELS[tool.tool];
-                  const isRea = tool.tool.startsWith('mcp__rea__');
-                  const rawName = isRea
-                    ? tool.tool.slice('mcp__rea__'.length)
-                    : tool.tool;
+                  const isRea = isReaToolId(tool.tool);
+                  const rawName = shortToolName(tool.tool);
 
-                  // Prefer a hand-written Chinese label; fall back to the id so
-                  // an unmapped tool is still identifiable rather than blank.
+                  // Prefer a hand-written Chinese label; fall back to the command
+                  // so an unmapped one is still identifiable rather than blank.
                   const label = zh ?? (isRea ? `REA · ${rawName}` : rawName);
 
                   return h(RankRow, {
@@ -1605,7 +1629,7 @@ window.__ModuleLoader__.load({
                 },
                   h('span', { className: 'rea-row-t' }, formatClock(row.at)),
                   h('span', { className: 'rea-row-name', title: row.tool },
-                    row.tool.replace(/^mcp__rea__/, '')),
+                    shortToolName(row.tool)),
                   h('span', {
                     className: `rea-row-ms${(row.durationMs ?? 0) > 2000 ? ' rea-row-ms-slow' : ''}`,
                   }, formatDuration(row.durationMs)),
@@ -1630,7 +1654,7 @@ window.__ModuleLoader__.load({
           }));
       }
 
-      const name = row.tool.replace(/^mcp__rea__/, '');
+      const name = shortToolName(row.tool);
       const ok = row.ok;
 
       return h('div', { className: 'rea-card rea-detail' },
@@ -1716,12 +1740,7 @@ window.__ModuleLoader__.load({
        * Nothing is hidden: the other count is stated, so a real cross-plugin
        * problem is still visible. It just stops being counted as this plugin's.
        */
-      const isReaTool = (name) => {
-        const raw = String(name ?? '');
-        return raw.startsWith('mcp__rea__')
-          || /^(rea_|mobile_|mobile|rea)(_|$)/.test(raw)
-          || raw === 'rea';
-      };
+      const isReaTool = isReaToolId;
       const otherGroups = errors.filter((g) => !isReaTool(g.tool));
       const otherCalls = otherGroups.reduce((n, g) => n + (g.count ?? 0), 0);
       const reaGroups = errors.length - otherGroups.length;
@@ -1796,7 +1815,7 @@ window.__ModuleLoader__.load({
                     h('small', null, '次')),
                   h('div', { className: 'rea-egrp-body' },
                     h('span', { className: 'rea-egrp-tool' },
-                      group.toolLabel ?? group.tool.replace(/^mcp__rea__/, '')),
+                      group.toolLabel ?? shortToolName(group.tool)),
                     // Chinese reading first; the raw technical text is one
                     // click away, since it is what a search or a bug report
                     // needs, and it is what the fix hint is derived from.
@@ -1874,7 +1893,7 @@ window.__ModuleLoader__.load({
                       style: { gridTemplateColumns: 'minmax(0,1fr) 58px' },
                     },
                       h('span', { className: 'rea-rank-name', title: tool.tool },
-                        tool.tool.replace(/^mcp__rea__/, '')),
+                        shortToolName(tool.tool)),
                       h('span', { className: 'rea-rank-n down' },
                         `${tool.failures} / ${tool.calls}`)))))),
           h('div', { className: 'rea-card' },
@@ -1891,7 +1910,7 @@ window.__ModuleLoader__.load({
                       style: { gridTemplateColumns: 'minmax(0,1fr) 58px' },
                     },
                       h('span', { className: 'rea-rank-name', title: tool.tool },
-                        tool.tool.replace(/^mcp__rea__/, '')),
+                        shortToolName(tool.tool)),
                       h('span', {
                         className: `rea-rank-n${tool.avgMs > 2000 ? ' warn' : ''}`,
                       }, formatDuration(tool.avgMs))))))),

@@ -1,31 +1,28 @@
 ---
 name: rea-cli
-description: 用 rea 命令行做逆向时的命令路由表与陷阱清单。当 REA 以「混合」或「命令行」模式接入（面板显示 REA 17/207 或 0/207），需要执行已注册工具之外的操作时加载本技能。
+description: 用 rea 工具做逆向时的命令路由表与陷阱清单。当你需要知道该用哪条 REA 命令、命令名怎么拼、或者大结果怎么处理时加载本技能。
 ---
 
-# REA 命令行路由表
+# REA 命令路由表
 
-面板的接入模式决定了你能怎么用 REA：
-
-| 面板显示 | 模式 | 你该怎么做 |
-|---|---|---|
-| `REA 207` | 全量 MCP | 直接用 `mcp__rea__*` 工具，本文档只在找不到工具时参考 |
-| `REA 17/207（混合）` | 混合 | 高频操作用 `mcp__rea__*` 工具；**其余全部走 `rea_cli`** |
-| `REA 0/207（命令行）` | 纯 CLI | 一切操作走 `rea_cli` |
-
-`rea_cli` 的用法：
+所有 REA 操作都走同一个工具 `rea`，它自己决定走命令行还是 MCP，你不用关心：
 
 ```
-rea_cli(action="run", command="<子命令>", args=["<参数>", ...], format="json")
+rea(command="<命令名>", args=["<参数>", ...], format="json")
 ```
+
+- **命令名**：下划线和连字符都接受（`analyze_function` 与 `analyze-function` 等价）
+- **参数**：走命令行的命令用 `args`（位置参数数组）；只有 MCP 支持的命令用 `input`（命名对象）
+- **不知道命令名**：`rea(command="help")` 拿完整清单
+- **参数写错**：会连同该命令的完整用法一起返回，照着改即可
 
 ---
 
 ## 一、先做两件侦察
 
 ```bash
-rea_cli(action="run", command="doctor", format="json")
-rea_cli(action="run", command="capabilities", format="json", tokenLimit=2000)
+rea(command="doctor", format="json")
+rea(command="capabilities", format="json", tokenLimit=2000)
 ```
 
 - `doctor` 告诉你哪些引擎真的可用、缺什么
@@ -90,10 +87,10 @@ rea_cli(action="run", command="capabilities", format="json", tokenLimit=2000)
 
 ```bash
 # 1. 先落盘
-rea_cli(action="run", command="analyze", args=["<path>"], format="json") > evidence.json
+rea(command="analyze", args=["<path>"], format="json") > evidence.json
 
 # 2. 再用 inspect-analysis-view 摘要或分页
-rea_cli(action="run", command="inspect-analysis-view",
+rea(command="inspect-analysis-view",
         args=["evidence.json"], format="json")
 ```
 
@@ -106,12 +103,12 @@ rea_cli(action="run", command="inspect-analysis-view",
 完整证据导出：
 
 ```bash
-rea_cli(action="run", command="evidence-export", args=["<source>", "<output>"])
+rea(command="evidence-export", args=["<source>", "<output>"])
 ```
 
 ### 输出格式
 
-`rea_cli` 的 `format` 参数控制 CLI 的 `--format`：
+`rea` 的 `format` 参数控制 CLI 的 `--format`：
 
 | 值 | 用途 |
 |---|---|

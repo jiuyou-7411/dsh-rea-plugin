@@ -23,7 +23,8 @@ import { ReaTelemetry, attachTelemetry } from './lib/telemetry.js';
 import { CACHE_ROOT, REA_AGENTS_VERSION, providerEnvironment, readConfiguredProviderEnv } from './lib/providers.js';
 import { createMcpClient, attachMcpBridge } from './lib/mcp-bridge.js';
 import { buildMobileTools } from './lib/tools-mobile.js';
-import { buildCliTool, setCliVersion } from './lib/tool-cli.js';
+import { buildReaTool } from './lib/tool-rea.js';
+import { setCliVersion } from './lib/tool-cli.js';
 import { buildDocsTool } from './lib/tool-docs.js';
 import { installSkills } from './lib/skills-install.js';
 import { provision, summarize } from './lib/provision.js';
@@ -71,8 +72,8 @@ export function apply(ctx, config = {}) {
     autoInstallProviders: config?.autoInstallProviders !== false,
     maxProviderDownloadMb: Number(config?.maxProviderDownloadMb ?? 2048),
     providerEnv: config?.providerEnv ?? {},
-    // How much of each tool definition reaches the system prompt, and which
-    // tools are registered at all. See `transport` below.
+    // How much of each tool definition reaches the system prompt. Only applies
+    // when the bridge mirrors tools, which the fused design does not do.
     toolShape: {
       compact: config?.compactToolSchemas !== false,
       maxDepth: Number(config?.toolSchemaDepth ?? 3),
@@ -89,7 +90,6 @@ export function apply(ctx, config = {}) {
        * costs about 60k tokens in every session whether or not the session
        * touches REA.
        */
-      transport: ['cli', 'hybrid', 'mcp'].includes(config?.transport) ? config.transport : 'hybrid',
     },
   };
 
@@ -186,10 +186,27 @@ export function apply(ctx, config = {}) {
   //               the 207 MCP tools.
   //
   // -------------------------------------------------------------------------
+  // Pin the upstream version once; the runner reads it on every spawn.
   setCliVersion(resolved.reaVersion);
 
   const extraTools = [
-    buildCliTool({ cliTimeoutMs: resolved.cliTimeoutMs }),
+    /*
+     * One tool for all of REA, routed internally.
+     *
+     * It replaces both the 207 MCP registrations (59,551 tokens of definitions
+     * in every request) and the bare CLI escape hatch (zero cost, but the model
+     * guesses argument names). The tool decides per command: exact CLI match →
+     * stateless CLI; otherwise → MCP. See lib/tool-rea.js.
+     *
+     * `getMcp` / `getMcpTools` are lazy because this array is built before the
+     * MCP connection starts.
+     */
+    buildReaTool({
+      reaVersion: resolved.reaVersion,
+      defaultTimeoutMs: resolved.cliTimeoutMs,
+      getMcp: () => (mcpBridge.state === 'ready' ? mcpClient : null),
+      getMcpTools: () => (mcpBridge.state === 'ready' ? mcpBridge.toolNames : null),
+    }),
     buildDocsTool(),
   ];
 
@@ -270,7 +287,11 @@ export function apply(ctx, config = {}) {
   };
 
   const mcpBridge = attachMcpBridge(ctx, mcpClient, {
-    shape: resolved.toolShape,
+    // The fused design keeps the connection but registers none of its tools:
+    // the unified `rea` tool dispatches to this client directly for the commands
+    // that only MCP can serve. Mirroring 207 definitions as well would charge the
+    // schema cost twice for no gain.
+    shape: { ...resolved.toolShape, register: false },
     onState(next) {
       mcpStatus = {
         ...mcpStatus,
@@ -300,7 +321,6 @@ export function apply(ctx, config = {}) {
     // Which access mode is active, and how many tools upstream offered before
     // this mode narrowed them. The panel shows both so "17 个工具" never reads
     // as "the plugin lost 190 tools".
-    transport: mcpBridge.transport,
     upstreamCount: mcpBridge.upstreamCount,
   });
 
@@ -309,13 +329,18 @@ export function apply(ctx, config = {}) {
   // Fire and forget: the panel renders "starting" and re-reads when ready.
   void startMcp().then((result) => {
     if (result.ok) {
-      // Mirror the MCP names into the shared list. Done here rather than inside
-      // the bridge so the bridge stays unaware of /status bookkeeping.
-      const mcpNames = typeof mcpBridge.listNames === 'function' ? mcpBridge.listNames() : [];
-      for (const name of mcpNames) {
-        if (!registeredToolNames.includes(name)) registeredToolNames.push(name);
-      }
-      ctx.logger?.info?.(`[rea] MCP bridge ready: ${result.toolCount} tools`);
+      /*
+       * The MCP names are deliberately NOT mirrored into `registeredToolNames`.
+       *
+       * They are not registered tools any more — the unified `rea` tool calls
+       * this client directly for the commands only MCP can serve. Adding their
+       * names to the Host's list would make /status report 207 tools that do not
+       * exist in the registry, and the panel would offer names the model cannot
+       * call.
+       */
+      ctx.logger?.info?.(
+        `[rea] MCP 通道就绪：${mcpBridge.upstreamCount} 个能力可经 rea 工具调用（不注册为独立工具）`,
+      );
     } else {
       ctx.logger?.warn?.(`[rea] MCP bridge failed: ${result.error}`);
     }
