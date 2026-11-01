@@ -10,6 +10,34 @@
 
 ---
 
+## [4.1.3] - 2026-11-02
+
+修「服务状态：异常」，并加上能拦住这类错误的测试。
+
+### 修复
+- **checkJava / checkPython 被误删**：我改 checkMcpTools 时用行号区间替换，
+  把夹在中间的两个函数一起删了。node --check 通过（引用不存在的标识符
+  是合法语法），插件正常加载，但 /health 每次都返回 500，
+  面板只显示「服务状态：异常」，看不出原因。已从 2adffc1 恢复
+
+### 新增
+- **scripts/smoke-host.mjs**：真正调用 buildHealth 和每个 API 路由
+  - 用假的 tools / telemetry / mcp 服务构造真实入参
+  - 检查 /status、/health、/metrics、/team 都返回 ok:true
+  - 路由注册按 path 去重（复刻真实 webServer 的行为）
+- 接进 npm run verify 和 CI
+
+### 负向验证
+删掉 checkJava 后冒烟测试报：
+
+    ✗ Host 冒烟测试失败：
+      - health.js 抛错：checkJava is not defined
+      - /health 返回 ok=false：checkJava is not defined
+
+还原后通过。
+
+---
+
 ## [4.1.2] - 2026-11-02
 
 修「团队」标签页不出现、KPI 卡片换行。

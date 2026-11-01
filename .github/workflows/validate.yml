@@ -50,6 +50,12 @@ jobs:
       - name: 客户端静态检查
         run: node scripts/check-client.mjs
 
+      # smoke-host.mjs 真正调用 buildHealth 和每个 API 路由。
+      # node --check 看不到「引用了被删掉的函数」，这类错误让
+      # 整个 /health 返回 500，面板只显示「服务状态：异常」。
+      - name: Host 冒烟测试
+        run: node scripts/smoke-host.mjs
+
       # verify-package.mjs 断言的是「装完能不能用」：文档树在不在、
       # lib 里的关键模块在不在、package.json 的字段齐不齐。
       - name: 运行打包前检查
