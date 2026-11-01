@@ -376,6 +376,7 @@ export function apply(ctx, config = {}) {
    */
   let teamsService = null;
   let agentsService = null;
+  let presetsService = null;
 
   ctx.inject(['agentTeams'], (scoped) => {
     teamsService = scoped.agentTeams ?? null;
@@ -386,6 +387,29 @@ export function apply(ctx, config = {}) {
     agentsService = scoped.agents ?? null;
     return () => { agentsService = null; };
   });
+
+  /*
+   * The preset registry, so the panel can answer "is the team preset actually
+   * registered" instead of the operator having to guess. `list()` is read-only
+   * and cheap; a failed call reports "unknown" rather than failing /team.
+   */
+  ctx.inject(['agentPresets'], (scoped) => {
+    presetsService = scoped.agentPresets ?? null;
+    return () => { presetsService = null; };
+  });
+
+  resolved.presetStatus = () => {
+    if (!presetsService?.list) return { available: false, hasRea: false, ids: [] };
+    try {
+      const rows = presetsService.list() ?? [];
+      const ids = (Array.isArray(rows) ? rows : [])
+        .map((row) => String(row?.id ?? row?.presetId ?? row?.name ?? ''))
+        .filter(Boolean);
+      return { available: true, hasRea: ids.includes('rea'), ids };
+    } catch (error) {
+      return { available: false, hasRea: false, ids: [], error: error?.message ?? String(error) };
+    }
+  };
 
   const teamView = createTeamView({
     getTeams: () => teamsService,

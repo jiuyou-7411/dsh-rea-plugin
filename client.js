@@ -1780,6 +1780,58 @@ window.__ModuleLoader__.load({
           }));
       }
 
+      /*
+       * Preset status.
+       *
+       * An empty roster and a missing preset look identical from the outside, and
+       * the operator's question — "where is the team" — is answered by different
+       * things in each case: create a session with the preset, or fix the
+       * registration. So the page states which one it is.
+       */
+      const presets = team?.presets ?? null;
+      const presetBanner = presets?.available && !presets.hasRea
+        ? h('div', {
+            className: 'rea-card',
+            style: {
+              marginBottom: '10px', padding: '10px 12px',
+              borderLeft: '3px solid var(--down, #c44a4a)',
+            },
+          },
+            h('div', {
+              style: { fontSize: '12px', fontWeight: 700, marginBottom: '4px' },
+            }, '「REA 逆向工作台」预设没有注册'),
+            h('div', {
+              style: { fontSize: '11px', color: 'var(--ink-3)', lineHeight: '1.6' },
+            }, '已注册的预设：', (presets.ids ?? []).join('、') || '（无）',
+              '。插件的 preset-rea 行没有生效，重启 DSH 后仍不行就看 Host 日志里的 preset-rea。'))
+        : null;
+
+      /*
+       * A roster with only the lead is not an error — it is the starting state.
+       * Saying so, with the exact call that changes it, is more useful than an
+       * empty-state that repeats "no members".
+       */
+      const leadOnly = members.length === 1
+        && (members[0].isLead || String(members[0].name).toLowerCase() === 'lead');
+      const leadHint = leadOnly
+        ? h('div', {
+            className: 'rea-card',
+            style: {
+              marginBottom: '10px', padding: '10px 12px',
+              borderLeft: '3px solid var(--accent)',
+            },
+          },
+            h('div', {
+              style: { fontSize: '12px', fontWeight: 700, marginBottom: '4px' },
+            }, '现在只有 Lead，还没有成员'),
+            h('div', {
+              style: { fontSize: '11px', color: 'var(--ink-3)', lineHeight: '1.6' },
+            }, '在「REA 逆向工作台」预设的会话里，让 Lead 调用 ',
+              h('code', null, 'spawn_teammate'),
+              ' 派活——每个成员一个独立目标，就能并行分析多个样本。',
+              '成员出现后这里会显示状态，它们跑的每条 REA 命令都会进「实时流」。'))
+        : null;
+
       const memberCard = h('div', { className: 'rea-card' },
         h('div', { className: 'rea-card-hd' },
           h('h3', null, '团队成员'),
@@ -1889,6 +1941,8 @@ window.__ModuleLoader__.load({
                     : null)))));
 
       return h('div', null,
+        presetBanner,
+        leadHint,
         h('div', { className: 'rea-cols-2' }, memberCard, taskCard),
         h('div', { className: 'rea-card', style: { marginTop: '10px' } },
           h('div', { className: 'rea-card-bd' },

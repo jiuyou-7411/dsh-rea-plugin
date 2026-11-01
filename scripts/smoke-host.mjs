@@ -101,6 +101,7 @@ try {
     reaVersion: '6.7.0',
     mcpStatus: () => ({ state: 'ready', toolCount: 0, upstreamCount: 207, error: null }),
     teamStatus: () => ({ available: true, members: [], tasks: [], updatedAt: null }),
+    presetStatus: () => ({ available: true, hasRea: true, ids: ['standard', 'rea'] }),
   });
 
   const seen = new Set();
