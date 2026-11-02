@@ -29,6 +29,7 @@ import { setCliVersion } from './lib/tool-cli.js';
 import { buildDocsTool } from './lib/tool-docs.js';
 import { installSkills } from './lib/skills-install.js';
 import { provision, summarize } from './lib/provision.js';
+import { readJdkMajorFromHome, REQUIRED_JAVA } from './lib/jdk.js';
 
 export const name = 'rea-host';
 
@@ -113,10 +114,46 @@ export function apply(ctx, config = {}) {
   const discovered = providerEnvironment();
 
   for (const [key, value] of Object.entries({ ...discovered, ...configured })) {
-    if (process.env[key]) {
+    const operatorValue = process.env[key];
+
+    if (operatorValue) {
+      /*
+       * One documented exception to "an operator variable is never overwritten":
+       * JAVA_HOME.
+       *
+       * REA's CLI reads JAVA_HOME, not REA_JAVA_HOME — measured: with only
+       * REA_JAVA_HOME pointed at a JDK 21, `analyze --provider ghidra` returns
+       * provider_unavailable; with JAVA_HOME set it succeeds. So a machine whose
+       * JAVA_HOME is Java 17 has a Ghidra that silently refuses to run, even
+       * though this plugin installed a working JDK 21 beside it.
+       *
+       * The override only happens when both versions are readable and the
+       * operator's is provably below REQUIRED_JAVA while ours is at or above it.
+       * An unreadable or sufficient operator JDK is left exactly as it was —
+       * guessing here would silently swap the Java version of every child
+       * process this plugin spawns.
+       */
+      if (key === 'JAVA_HOME') {
+        const operatorMajor = readJdkMajorFromHome(operatorValue);
+        const oursMajor = readJdkMajorFromHome(value);
+        if (
+          operatorMajor !== null
+          && oursMajor !== null
+          && operatorMajor < REQUIRED_JAVA
+          && oursMajor >= REQUIRED_JAVA
+        ) {
+          process.env[key] = value;
+          published.push(
+            `${key} (operator Java ${operatorMajor} 不满足 Ghidra 的 ${REQUIRED_JAVA}，改用插件装的 Java ${oursMajor})`,
+          );
+          continue;
+        }
+      }
+
       published.push(`${key} (operator-exported, kept)`);
       continue;
     }
+
     process.env[key] = value;
     published.push(`${key} (${value === configured[key] ? 'config' : 'discovered'})`);
   }

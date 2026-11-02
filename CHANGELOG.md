@@ -10,6 +10,36 @@
 
 ---
 
+## [4.2.0] - 2026-11-02
+
+修 Ghidra 静默不可用：插件装的 JDK 21 根本没被用上。
+
+### 修复
+- **JAVA_HOME 优先级错误导致 Ghidra 不可用**。实测：
+  - 只设 `REA_JAVA_HOME`=JDK21 → `analyze --provider ghidra` 返回
+    `provider_unavailable`
+  - 只设 `JAVA_HOME`=JDK21 → 正常返回 Evidence
+
+  REA 的 CLI 读的是 **JAVA_HOME**，不是 REA_JAVA_HOME。而插件的
+  「操作者设的变量永不覆盖」规则把用户环境里的 JDK 17 保留了，
+  于是 Ghidra 12.1.4（要求 21+）静默拒绝工作——尽管插件早就
+  在 ~/.dsh/rea-jdk/jdk-21 装好了能用的 21。
+
+  现在对 JAVA_HOME 开一个**有证据才覆盖**的例外：
+  两边的 `release` 文件都读得到、且操作者的版本 < 21、插件的 ≥ 21 时才替换。
+  读不到或已满足则原样保留。
+
+- **`--token-limit` 与结构化格式冲突**：`--format json --token-limit 500`
+  返回 `UNSUPPORTED_OUTPUT_COMBINATION`（Token windows cannot preserve
+  structured output）。rea 工具在 format 为 json/jsonl/toon/yaml 时
+  不再转发 tokenLimit，改用 `filter` 限制体积。
+
+### 新增
+- `lib/jdk.js` 导出 `readJdkMajorFromHome()`：读 `<JAVA_HOME>/release`
+  取版本号，不起子进程，激活时零成本
+
+---
+
 ## [4.1.4] - 2026-11-02
 
 团队页说清楚「为什么没有成员」。
