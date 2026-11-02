@@ -1292,7 +1292,7 @@ window.__ModuleLoader__.load({
       // The slowest list is the only per-tool aggregate the Host exposes with a
       // call count, so "most used" is derived from it rather than invented.
       const topTools = useMemo(() => {
-        const list = metrics?.slowest ?? [];
+        const list = (metrics?.slowest ?? []).filter((tool) => isReaToolId(tool.tool));
         return [...list].sort((a, b) => b.calls - a.calls).slice(0, 5);
       }, [metrics]);
 
@@ -1407,9 +1407,9 @@ window.__ModuleLoader__.load({
           // The old badge read "近 200 条", which named a window nobody asked
           // about. What matters is how many calls were recorded and how many
           // slots remain before the oldest is evicted.
-          delta: `${metrics?.buffered ?? 0} / ${metrics?.maxEntries ?? STREAM_LIMIT}`,
+          delta: `${metrics?.reaBuffered ?? 0} / ${metrics?.maxEntries ?? STREAM_LIMIT}`,
           label: '本次调用',
-          value: String(total),
+          value: String(reaCalls),
           unit: '次',
           foot: `${reaCalls} 次 REA · ${otherCalls} 次其他工具`,
         }),
@@ -1424,8 +1424,8 @@ window.__ModuleLoader__.load({
           // Failures outside REA stay visible here rather than inflating the
           // headline: an `edit` rejected on a file lock is not an engine fault.
           foot: otherFailed > 0
-            ? `${metrics?.errors?.length ?? 0} 类错误 · 其余工具 ${otherFailed} 次失败`
-            : `${metrics?.errors?.length ?? 0} 类错误`,
+            ? `${alerts.length} 类错误 · 其余工具 ${otherFailed} 次失败`
+            : `${alerts.length} 类错误`,
         }),
         h(Kpi, {
           icon: Icon.chart,
@@ -1577,9 +1577,9 @@ window.__ModuleLoader__.load({
           otherCalls > 0 && avgOther.value !== '—'
             ? `其余工具 ${avgOther.value}${avgOther.unit ?? ''}`
             : (reaFailed > 0 ? `含 ${reaFailed} 次失败` : '无失败')),
-        summaryCard('缓冲区', String(metrics?.buffered ?? 0),
+        summaryCard('缓冲区', String(metrics?.reaBuffered ?? 0),
           ` / ${metrics?.maxEntries ?? STREAM_LIMIT}`,
-          `丢弃 ${metrics?.dropped ?? 0} 条`),
+          `丢弃 ${metrics?.reaDropped ?? 0} 条`),
         summaryCard('连接', '实时', null, '服务端推送'));
 
       return h('div', null,
@@ -1974,8 +1974,8 @@ window.__ModuleLoader__.load({
     /** Errors: grouped failures, ranked tools, and a time histogram. */
     function ErrorsPage({ metrics, onReset }) {
       const errors = metrics?.errors ?? [];
-      const failing = metrics?.failing ?? [];
-      const slowest = metrics?.slowest ?? [];
+      const failing = (metrics?.failing ?? []).filter((tool) => isReaToolId(tool.tool));
+      const slowest = (metrics?.slowest ?? []).filter((tool) => isReaToolId(tool.tool));
       // One key at a time: two expanded payloads side by side is unreadable.
       const [openKey, setOpenKey] = useState(null);
 
@@ -3389,6 +3389,7 @@ window.__ModuleLoader__.load({
           } catch {
             return;
           }
+          if (!isReaToolId(row?.tool)) return;
           setStream((current) => {
             const next = [row, ...current];
             return next.length > STREAM_LIMIT ? next.slice(0, STREAM_LIMIT) : next;
@@ -3575,7 +3576,7 @@ window.__ModuleLoader__.load({
 
       // ---- derived --------------------------------------------------------
       const counts = metrics?.counts ?? {};
-      const errorTotal = counts.failed ?? 0;
+      const errorTotal = counts.reaFailed ?? 0;
       const healthErrors = (health?.checks ?? []).filter((check) => check.status === 'error').length;
       const healthWarns = (health?.checks ?? []).filter((check) => check.status === 'warn').length;
       const missingEngines = (status?.providers ?? []).filter((entry) => !entry.present).length;
@@ -3667,7 +3668,7 @@ window.__ModuleLoader__.load({
 
           h('div', { className: 'rea-tb-right' },
             h('span', { className: 'rea-stat' },
-              '调用 ', h('b', { className: 'num' }, String(counts.total ?? 0))),
+              '调用 ', h('b', { className: 'num' }, String(counts.rea ?? 0))),
             h('span', { className: 'rea-stat' },
               '异常 ', h('b', { className: 'num down' }, String(errorTotal))),
             h('span', { className: 'rea-stat rea-stat-hide' },

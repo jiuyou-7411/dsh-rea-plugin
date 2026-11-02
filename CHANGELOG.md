@@ -10,6 +10,37 @@
 
 ---
 
+## [4.3.1] - 2026-11-02
+
+把「非 REA 的错误」从所有界面彻底清掉（独立审计，7 处）。
+
+### 修复
+面板读的是 Host 整个工具注册表，所以别插件的错误会漏进 REA 的各个角落。
+这次逐处堵上：
+
+- **SSE 实时流**（`lib/api.js`）：事件接口直接转发全量遥测，
+  `edit`、`pwsh`、网页抓取都会推给面板。改为统一走 `ReaTelemetry.isReaTool()`
+- **轮询接口**（`lib/api.js`）：同上，`/events?since=` 的返回也过滤
+- **工具排行**（`client.js`）：「最常用 / 最慢 / 失败最多」直接渲染
+  `metrics.slowest` / `metrics.failing`，含非 REA 工具。改为按 `isReaToolId()` 过滤
+- **前端二次过滤**（`client.js`）：`EventSource.onmessage` 只解析 JSON 不检查归属，
+  服务端将来若返回旧缓存仍会污染。加一层客户端过滤
+- **顶部统计**（`client.js`）：工具栏「调用 / 异常」用的是 `counts.total` /
+  `counts.failed`（全量）。改为 `counts.rea` / `counts.reaFailed`
+- **缓冲区与丢弃数**（`lib/telemetry.js` + `client.js`）：
+  遥测只提供全量 `buffered` / `dropped`。新增 `reaBuffered` / `reaDropped`
+- **重置后 NaN**（`lib/telemetry.js`）：`reset()` 漏掉 `other` / `otherFailed`，
+  重置后下一次非 REA 调用会从 `undefined` 累加出 `NaN`。补齐计数结构
+- **健康检查的 REA 判定**（`lib/health.js`）：原来用 `startsWith('rea')`，
+  认不出 `mcp__rea__*`（以 `mcp` 开头）。改为复用 `ReaTelemetry.isReaTool()`
+
+### 验证
+四条脚本全部通过；真实分析（whoami.exe，用插件自己的 providerEnvironment）：
+`analyze` 32.5s、`search --kind procedures` 30.3s（272 个过程）、
+`decompile` 28.8s。
+
+---
+
 ## [4.3.0] - 2026-11-02
 
 原生分析流程打通：decompile / function / xrefs 全部可用。
