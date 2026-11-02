@@ -436,15 +436,29 @@ export function apply(ctx, config = {}) {
   });
 
   resolved.presetStatus = () => {
-    if (!presetsService?.list) return { available: false, hasRea: false, ids: [] };
+    if (!presetsService?.list) return { available: false, hasRea: null, ids: [] };
     try {
       const rows = presetsService.list() ?? [];
-      const ids = (Array.isArray(rows) ? rows : [])
+      const list = Array.isArray(rows) ? rows : [];
+      const ids = list
         .map((row) => String(row?.id ?? row?.presetId ?? row?.name ?? ''))
         .filter(Boolean);
-      return { available: true, hasRea: ids.includes('rea'), ids };
+      /*
+       * An empty `ids` means the shape of `list()` is not what this expected —
+       * NOT that no presets exist. Reporting `hasRea: false` from an empty list
+       * made the panel claim the preset was missing while it was registered, so
+       * the "missing" verdict now requires a non-empty list that lacks it.
+       */
+      const known = ids.length > 0;
+      return {
+        available: true,
+        known,
+        hasRea: known ? ids.includes('rea') : null,
+        ids,
+        count: list.length,
+      };
     } catch (error) {
-      return { available: false, hasRea: false, ids: [], error: error?.message ?? String(error) };
+      return { available: false, hasRea: null, ids: [], error: error?.message ?? String(error) };
     }
   };
 

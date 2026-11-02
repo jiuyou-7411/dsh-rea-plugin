@@ -1789,7 +1789,7 @@ window.__ModuleLoader__.load({
        * registration. So the page states which one it is.
        */
       const presets = team?.presets ?? null;
-      const presetBanner = presets?.available && !presets.hasRea
+      const presetBanner = presets?.hasRea === false
         ? h('div', {
             className: 'rea-card',
             style: {
