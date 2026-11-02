@@ -10,6 +10,50 @@
 
 ---
 
+## [4.4.0] - 2026-11-02
+
+修命令注入漏洞。
+
+### 安全
+- **`shell: true` + 模型控制的参数 = 任意命令执行**。
+
+  `lib/tool-cli.js` 原来这样起进程：
+
+  ```js
+  spawn('npx.cmd', ['-y', 'rea-agents@6.7.0', ...argv], { shell: true })
+  ```
+
+  Windows 上 Node 把 args 用空格拼成一条命令行交给 cmd.exe，**不做任何转义**。
+  实测：把一个含 `x & echo INJECTED` 的参数传进去，`echo` 被执行了。
+
+  `argv` 来自模型调用的 `args`，所以一个精心构造的文件路径、
+  或者一次提示词注入，就能在本机执行任意命令。
+
+  **修法**：不再用 shell。改成 `node <npx-cli.js>` 直接执行，
+  `shell: false`，参数以 argv 数组传递。同样的 payload 现在是惰性的。
+
+  `lib/mcp-client.js` 的 MCP 进程启动有同样的写法，一并改了。
+  两处共用 `lib/tool-cli.js` 的 `npxInvocation()`，避免以后新增的 spawn
+  又悄悄把 shell 加回来。
+
+### 验证
+| 项目 | 结果 |
+|---|---|
+| 调用形式 | `command=node`, `args[0]=npx-cli.js`, `shell: false` |
+| 注入 payload | ✓ 被阻断（修复前会执行） |
+| 正常调用 | ✓ `rea --version` → 6.7.0 |
+| 真实分析 | ✓ analyze 32.8s、search --kind procedures 30.0s |
+
+### 审计其余部分（未发现需要修改）
+- 所有 `setInterval` 都有配对的 `clearInterval`
+- `EventSource` 在卸载和重建时都 `close()`
+- 空 `catch` 只有两类：`child.kill()` 的 already-gone、JSON 解析兜底，都合理
+- 遥测的 `other` / `otherFailed` 在记录路径正常累加
+- `providers.js` 的 `runShell` 仍用 shell，但参数来自插件自身的引擎路径与固定开关，
+  不经过模型，风险低；改它需要处理 .bat 带空格的路径，收益不抵风险
+
+---
+
 ## [4.3.1] - 2026-11-02
 
 把「非 REA 的错误」从所有界面彻底清掉（独立审计，7 处）。
