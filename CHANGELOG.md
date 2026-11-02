@@ -10,6 +10,48 @@
 
 ---
 
+## [4.3.0] - 2026-11-02
+
+原生分析流程打通：decompile / function / xrefs 全部可用。
+
+### 修复
+- **decompile/function/xrefs 一直失败的原因找到了**：第二个参数必须是
+  **过程起点**，不是任意地址。`search` 默认返回的是字符串地址
+  （字符串位于函数内部，不是函数开头），所以直接被拒。
+  REA 自己的报错里就写着正确做法，但没人会去读那一长串。
+
+  现在工具描述里写清完整流程：
+  1. `analyze <path>` 总览
+  2. `search <path> . --kind procedures --mode regex --provider ghidra` 列过程
+  3. `decompile <path> <过程名或起始地址>`
+  4. `function / xrefs <path> <过程名>`
+
+  地址不是过程起点时，报错直接给出第 2 步的确切命令。
+
+### 实测（whoami.exe，全部经 rea 工具）
+| 步骤 | 结果 |
+|---|---|
+| `analyze` | ✓ 32.3s |
+| `search --kind procedures` | ✓ 32.8s，**272 个过程** |
+| `decompile FUN_140001010` | ✓ 32.9s，返回反编译代码 |
+| `function FUN_140001010` | ✓ 32.5s，返回函数详情 |
+| `xrefs FUN_140001010` | ✓ 33.6s，返回交叉引用 |
+| 字符串地址传给 decompile | ✗ 预期失败，报错指向 search --kind procedures |
+
+反编译输出示例：
+```c
+void FUN_140001010(void)
+{
+  FUN_140001ea0(FUN_14000e100);
+  return;
+}
+```
+
+### 变更
+- 错误页默认只显示 REA 的错误，其它插件的点按钮展开
+
+---
+
 ## [4.2.5] - 2026-11-02
 
 MCP 参数错误也说清楚该传什么。
