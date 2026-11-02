@@ -10,6 +10,45 @@
 
 ---
 
+## [4.2.4] - 2026-11-02
+
+一次性审计，不再逐个修。
+
+### 修复
+- **REA 用 JSON 报错但退出码是 0**：`decompile <path>` 返回
+  `{"code":"invalid_request","details":{"issues":[...]}}` 且退出码 0，
+  工具当成成功把错误对象返回给模型。现在先检查 JSON 信封再看退出码
+- **退出码本身不可靠**：同一个非法调用两次运行分别返回 0 和 1。
+  `describeCliFailure` 改为优先解析 JSON，退出码只作兜底
+- **第二条参数实际必填**：用法里写成 `[address]` / `[pattern]` 看起来可选，
+  实际必填。`decompile`、`function`、`xrefs`、`search`、`extract-firmware`
+  都在本地预检，缺第二个参数立刻拒绝并给示例
+- **工具描述补上正确的原生分析流程**：
+  `analyze → inspect-native-load-image → search → decompile/function/xrefs`，
+  并注明 decompile 类命令的地址要用加载映射里的，文件偏移会被拒绝
+
+### 新增
+- **`scripts/e2e.mjs`**：一次性审计所有工具和路由
+  - 每个工具的 `output.render` 必须返回内容块数组（上一轮 100% 失败的根因）
+  - 路径优先命令缺路径必须秒拒
+  - 每条 GET 路由必须应答 `ok: true`
+  - 健康检查不能把纯参数错判成 error
+
+### 实测（whoami.exe，真实运行）
+| 命令 | 结果 |
+|---|---|
+| `analyze` | ✓ 29.9s，6756 字符，有 evidence_id |
+| `inspect` | ✓ 28.4s |
+| `search <path> Lookup` | ✓ 30.6s，返回 address+value 列表 |
+| `xrefs <path> <addr>` | ✓ 30.0s |
+| `decompile <path> <addr>` | ✗ REA 拒绝：地址需加载映射 |
+| `function <path> <addr>` | ✗ 同上 |
+
+后两条是 REA 自身的地址语义（同一个地址 `xrefs` 接受、`decompile` 拒绝），
+不是插件缺陷。工具现在把 REA 给出的原因原样转述并附上修复建议。
+
+---
+
 ## [4.2.3] - 2026-11-02
 
 参数用法错误不再算成「插件故障」。
