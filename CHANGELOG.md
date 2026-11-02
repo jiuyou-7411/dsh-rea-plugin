@@ -10,6 +10,39 @@
 
 ---
 
+## [4.2.5] - 2026-11-02
+
+MCP 参数错误也说清楚该传什么。
+
+### 修复
+- **MCP 独有命令的参数错误没有指引**：`list_strings` 不在 CLI 里，
+  模型猜了 `{path, filter, limit}`，MCP 回
+  `Unrecognized keys: "path", "filter", "limit"`——只说错了什么，
+  没说该传什么。现在桥接层保留每个工具的 inputSchema，
+  报错时列出**接受的参数名和必填项**：
+
+      `list_strings` 的参数不被接受。
+      它接受的参数：target、min_length、provider
+      必填：target
+      例：command="list_strings", input={"target":"..."}
+
+- **`inspect-binary-layout` 的描述写错了**：原来写「ELF/PE 布局（不需引擎）」，
+  实际只支持 Linux ELF，PE 会返回 `capability_unavailable`
+  （pwntools profile 只支持 Linux x64）。描述改为
+  「Linux ELF 布局（只支持 ELF，PE 会拒绝）」
+
+### 实测（4.2.4 上线后的真实错误分布）
+| 错误 | 次数 | 性质 |
+|---|---|---|
+| `tool call aborted` | 2 | 用户/超时取消，不是故障 |
+| `search 还需要第二个参数` | 2 | 新预检生效，模型已被告知 |
+| `list_strings` 参数错 | 1 | 本轮修复 |
+| `inspect-binary-layout` 引擎不可用 | 1 | 描述错误，本轮修复 |
+
+健康状态已从 error 降为 warn（4 失败 · 3 参数错 / 17）。
+
+---
+
 ## [4.2.4] - 2026-11-02
 
 一次性审计，不再逐个修。

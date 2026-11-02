@@ -258,6 +258,7 @@ export function apply(ctx, config = {}) {
       defaultTimeoutMs: resolved.cliTimeoutMs,
       getMcp: () => (mcpBridge.state === 'ready' ? mcpClient : null),
       getMcpTools: () => (mcpBridge.state === 'ready' ? mcpBridge.toolNames : null),
+      getMcpSchemas: () => (mcpBridge.state === 'ready' ? mcpBridge.toolSchemas : null),
     }),
     buildDocsTool(),
   ];
