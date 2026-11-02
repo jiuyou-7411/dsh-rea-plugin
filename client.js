@@ -1297,7 +1297,18 @@ window.__ModuleLoader__.load({
       }, [metrics]);
 
       const maxCalls = topTools.reduce((max, entry) => Math.max(max, entry.calls), 0);
-      const alerts = (metrics?.errors ?? []).slice(0, 3);
+      /*
+       * Alerts are this plugin's own failures only.
+       *
+       * The card used to take the first three of every error the Host recorded,
+       * so a binary file the read tool refused or a web fetch blocked by DNS
+       * appeared here as if REA had failed. Measured on a live profile: both
+       * alerts on screen were from other tools, and neither mentioned REA — which
+       * is exactly what "又有报错" looks like from the outside.
+       */
+      const alerts = (metrics?.errors ?? [])
+        .filter((group) => isReaToolId(group.tool))
+        .slice(0, 3);
       // REA analysis time only. Mixed with shell and file calls it produced a
       // "680 ms average" that described no real workload.
       const avg = formatShortDuration(counts.reaAvgMs ?? null);
@@ -1468,8 +1479,8 @@ window.__ModuleLoader__.load({
       const alertsBody = alerts.length === 0
         ? h(Empty, {
             icon: Icon.check,
-            title: '没有失败记录',
-            body: '自 Harness 启动以来所有工具调用都成功了。',
+            title: 'REA 没有失败记录',
+            body: '本插件的工具调用全部成功。其它插件的错误在「错误」页点按钮查看。',
           })
         : h('div', { className: 'rea-alerts' },
             alerts.map((group) => {
