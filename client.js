@@ -1969,6 +1969,20 @@ window.__ModuleLoader__.load({
       const [openKey, setOpenKey] = useState(null);
 
       /*
+       * Show only this plugin's errors by default.
+       *
+       * The panel reads the Host's whole tool registry, so the list also fills
+       * with `edit` racing a file lock and an unrelated `pwsh` failure. Measured
+       * on a live profile: 3 of 5 visible errors were file-write noise from
+       * editing this very plugin while it was loaded, and 2 were an aborted call.
+       * None of them said anything about REA — but they filled the page, which is
+       * what "报错又来了" looks like from the outside.
+       *
+       * The other errors are still one click away; they are not hidden.
+       */
+      const [showAll, setShowAll] = useState(false);
+
+      /*
        * `target_unavailable` is not a fault.
        *
        * Every REA tool works against the currently opened target, so calling
@@ -1997,14 +2011,24 @@ window.__ModuleLoader__.load({
       const otherGroups = errors.filter((g) => !isReaTool(g.tool));
       const otherCalls = otherGroups.reduce((n, g) => n + (g.count ?? 0), 0);
       const reaGroups = errors.length - otherGroups.length;
+      /** What the list actually renders, per the toggle above. */
+      const visibleErrors = showAll ? errors : errors.filter((g) => isReaTool(g.tool));
 
       return h('div', { className: 'rea-cols-2' },
         h('div', null,
           h('div', { className: 'rea-sec-label' },
-            `错误聚合${errors.length > 0 ? ` · ${errors.length} 类` : ''}`
+            `错误聚合${visibleErrors.length > 0 ? ` · ${visibleErrors.length} 类` : ''}`
             + (otherGroups.length > 0
               ? `（REA ${reaGroups} 类 · 其它插件 ${otherGroups.length} 类）`
-              : '')),
+              : ''),
+            otherGroups.length > 0
+              ? h('button', {
+                  type: 'button',
+                  className: 'rea-btn rea-btn-sm rea-btn-ghost',
+                  style: { marginLeft: '8px', padding: '1px 6px', fontSize: '10px' },
+                  onClick: () => setShowAll((v) => !v),
+                }, showAll ? '只看 REA' : `含其它插件 ${otherGroups.length} 类`)
+              : null),
 
           otherCalls > 0
             ? h('div', {
@@ -2052,14 +2076,18 @@ window.__ModuleLoader__.load({
                   : null)
             : null,
 
-          errors.length === 0
+          visibleErrors.length === 0
             ? h('div', { className: 'rea-card' },
                 h(Empty, {
                   icon: Icon.check,
-                  title: '没有失败记录',
-                  body: '自 Harness 启动以来所有工具调用都成功了。',
+                  title: showAll ? '没有失败记录' : 'REA 没有失败记录',
+                  body: showAll
+                    ? '自 Harness 启动以来所有工具调用都成功了。'
+                    : (otherGroups.length > 0
+                      ? `REA 工具全部成功；另有其它插件 ${otherGroups.length} 类错误，点上方按钮查看。`
+                      : '自 Harness 启动以来所有工具调用都成功了。'),
                 }))
-            : errors.map((group) => {
+            : visibleErrors.map((group) => {
                 const open = openKey === group.key;
                 const ex = group.explanation;
                 return h('div', { key: group.key, className: 'rea-egrp' },
