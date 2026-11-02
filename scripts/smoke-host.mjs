@@ -15,6 +15,7 @@
  * Run: node scripts/smoke-host.mjs
  */
 
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -131,6 +132,40 @@ try {
 
 /** Routes the panel always calls; each must answer with `ok: true`. */
 const REQUIRED = ['/status', '/health', '/metrics', '/team'];
+
+/*
+ * Every `output.render` must take two arguments and return content blocks.
+ *
+ * The Host stores whatever render returns as `result.content`, and spill-policy
+ * calls `content.some(...)` on it. A render declared as `(value) => string`
+ * therefore fails EVERY call to that tool with `content.some is not a function` —
+ * measured at 100% of calls to `rea` and `rea_docs`, because three of the
+ * registrations in this package used that shape while lib/tools.js used the
+ * correct one. It is invisible to `node --check` and to a unit test that never
+ * runs the Host's projection step.
+ */
+const RENDER_FILES = ['index.js', 'lib/mcp-bridge.js', 'lib/tools.js'];
+
+for (const relative of RENDER_FILES) {
+  let source = '';
+  try {
+    source = readFileSync(path.join(ROOT, relative), 'utf8');
+  } catch {
+    continue;
+  }
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!/\brender:\s*\(/.test(line)) continue;
+    // A correct render starts with two parameters: `(_args, value)` or `(args, value)`.
+    if (/\brender:\s*\(\s*(_[a-zA-Z]+|[a-zA-Z]+)\s*,/.test(line)) continue;
+    fail(
+      `${relative}:${i + 1} 的 render 只声明了一个参数。`
+      + ' 必须是 render(args, value) 并返回 [{type:"text",text:...}]，'
+      + ' 否则 Host 会把字符串当 content，spill-policy 调 .some() 时整次调用失败',
+    );
+  }
+}
 
 for (const suffix of REQUIRED) {
   const route = routes.find((r) => r.path.endsWith(suffix));

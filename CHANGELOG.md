@@ -10,6 +10,46 @@
 
 ---
 
+## [4.2.2] - 2026-11-02
+
+修 100% 调用失败：render 签名写错。
+
+### 修复
+- **`content.some is not a function`（每次调用必崩）**。
+
+  Host 的约定是 `output.render(args, value)` —— **两个参数，返回内容块数组**：
+
+  ```js
+  rendered = tool.output.render(exec.arguments, value);
+  const content = snapshotProjection(tool.name, "render", rendered);
+  ```
+
+  然后 `spill-policy` 对这个 `content` 调 `.some()`。
+
+  本插件有 3 处写成了 `render: (value) => 字符串`：
+  `index.js` 两处（`rea`、`rea_docs`）、`lib/mcp-bridge.js` 一处。
+  字符串没有 `.some`，于是**每次调用都失败**，和输出大小无关——
+  上一版我误判成「输出太大触发落盘」，加了 36k 上限，没解决。
+
+  `lib/tools.js` 里的工具一直是对的（`(_args, value) => [{type:'text',...}]`），
+  所以只有这三处注册的工具挂。
+
+### 新增
+- `scripts/smoke-host.mjs` 增加静态检查：扫描 `index.js`、`lib/mcp-bridge.js`、
+  `lib/tools.js` 里所有 `render:` 声明，只声明一个参数的直接判失败
+
+### 负向验证
+把 index.js 的 render 改回错误写法后：
+
+    ✗ Host 冒烟测试失败：
+      - index.js:217 的 render 只声明了一个参数。必须是 render(args, value)
+        并返回 [{type:"text",text:...}]，否则 Host 会把字符串当 content，
+        spill-policy 调 .some() 时整次调用失败
+
+还原后通过。
+
+---
+
 ## [4.2.1] - 2026-11-02
 
 修「近期错误 6/8」和预设误报。

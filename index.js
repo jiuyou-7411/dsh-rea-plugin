@@ -203,7 +203,21 @@ export function apply(ctx, config = {}) {
       parameters: tool.parameters,
       output: {
         schema: { type: 'string' },
-        render: (value) => (typeof value === 'string' ? value : JSON.stringify(value, null, 2)),
+        /*
+         * render(args, value) — TWO arguments, and the return must be content
+         * blocks, not a string.
+         *
+         * Measured the hard way: the Host stores whatever render returns as
+         * `result.content`, and spill-policy then calls `content.some(...)` on it.
+         * A string has no .some, so every call to a tool declared this way failed
+         * with `content.some is not a function` — 100% of them, regardless of
+         * output size. The tools in lib/tools.js already had the right shape;
+         * these three did not.
+         */
+        render: (_args, value) => [{
+          type: 'text',
+          text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+        }],
       },
       execute: tool.execute,
       // Two MobileRE runs on the same device would fight over adb/frida.
@@ -256,7 +270,21 @@ export function apply(ctx, config = {}) {
       parameters: tool.parameters,
       output: {
         schema: { type: 'string' },
-        render: (value) => (typeof value === "string" ? value : JSON.stringify(value, null, 2)),
+        /*
+         * render(args, value) — TWO arguments, and the return must be content
+         * blocks, not a string.
+         *
+         * Measured the hard way: the Host stores whatever render returns as
+         * `result.content`, and spill-policy then calls `content.some(...)` on it.
+         * A string has no .some, so every call to a tool declared this way failed
+         * with `content.some is not a function` — 100% of them, regardless of
+         * output size. The tools in lib/tools.js already had the right shape;
+         * these three did not.
+         */
+        render: (_args, value) => [{
+          type: 'text',
+          text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+        }],
       },
       execute: tool.execute,
       // The CLI spawns npx; two concurrent runs would fight over the npm cache.
